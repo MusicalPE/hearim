@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>헤아림 HearI'm · 실시간 설문</title>
+<meta name="description" content="QR을 찍고 고르면 결과가 바로 화면에 올라오는 실시간 설문. 설치도 가입도 없이 참여해요.">
+<meta property="og:title" content="헤아림 HearI'm">
+<meta property="og:description" content="QR을 찍고 고르면 결과가 바로 화면에 올라오는 실시간 설문">
+<meta property="og:image" content="https://musicalpe.github.io/hearim/og.png">
+<meta name="theme-color" content="#0F8B8D">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #F6F4EF; --surface: #FFFFFF; --ink: #1F2933; --ink-2: #4A5560; --ink-3: #7B8794;
+    --line: #E4E0D8; --line-2: #EFECE6; --brand: #0F8B8D; --brand-dark: #0B6E70; --brand-tint: #E3F4F4;
+    --accent: #FFC857; --warn: #B5402D; --warn-tint: #FDEEEA; --r: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.55; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .logo { font-weight: 900; font-size: 1.5em; letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
+  .logo b { color: var(--brand); }
+  .logo small { font-weight: 600; font-size: .5em; color: var(--ink-3); margin-left: 8px; letter-spacing: 0; }
+  h1 { font-size: 1.7em; line-height: 1.25; margin: 0 0 6px; letter-spacing: -.02em; }
+  h2 { font-size: 1.15em; margin: 0 0 10px; }
+  .hint { color: var(--ink-3); font-size: .92em; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; margin-bottom: 14px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; text-decoration: none; color: var(--ink); }
+  .btn:hover { border-color: var(--brand); color: var(--brand-dark); }
+  .btn.main { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.main:hover { background: var(--brand-dark); color: #fff; }
+  .btn.sm { min-height: 38px; padding: 6px 14px; font-size: .92em; }
+  .btn.danger { color: var(--warn); }
+  .btn.danger.armed { background: var(--warn); border-color: var(--warn); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=text], textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  input[type=text]:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+  label.f { display: block; font-weight: 700; margin: 14px 0 6px; }
+  label.chk { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; cursor: pointer; }
+  label.chk input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--brand); flex: none; }
+  .msg { padding: 12px 14px; border-radius: 12px; background: var(--brand-tint); color: var(--brand-dark); margin: 10px 0; }
+  .msg.bad { background: var(--warn-tint); color: var(--warn); }
+  .empty { text-align: center; color: var(--ink-3); padding: 28px 8px; }
+
+  /* 참여 화면 */
+  .q { font-size: 1.45em; font-weight: 800; line-height: 1.3; letter-spacing: -.01em; margin: 4px 0 16px; }
+  .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 15px 16px; margin-bottom: 10px; border: 2px solid var(--line); border-radius: 14px; background: #fff; font-weight: 700; font-size: 1.05em; }
+  .opt .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink-3); flex: none; }
+  .opt.on { border-color: var(--brand); background: var(--brand-tint); }
+  .opt.on .dot { border-color: var(--brand); background: radial-gradient(circle, var(--brand) 0 45%, #fff 50%); }
+
+  /* 막대 */
+  .bar { margin-bottom: 12px; }
+  .bar .lab { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; margin-bottom: 4px; }
+  .bar .lab span:last-child { color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .bar .track { height: 16px; background: var(--line-2); border-radius: 999px; overflow: hidden; }
+  .bar .fill { height: 100%; width: 0; background: var(--brand); border-radius: 999px; transition: width .5s ease; }
+  .bar.lead .fill { background: var(--accent); }
+  .cmt { padding: 10px 12px; border-left: 4px solid var(--brand); background: var(--bg); border-radius: 0 10px 10px 0; margin-bottom: 8px; }
+  .cmt small { color: var(--ink-3); display: block; }
+
+  /* 만든 설문 목록 */
+  .poll { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; background: #fff; }
+  .poll h3 { margin: 0 0 4px; font-size: 1.05em; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .8em; font-weight: 700; background: var(--brand-tint); color: var(--brand-dark); }
+  .tag.off { background: var(--line-2); color: var(--ink-3); }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; letter-spacing: .08em; }
+
+  /* 결과 화면 (큰 화면) */
+  body.board { background: #12222B; color: #F4F2EE; }
+  body.board .wrap { max-width: none; padding: 3.2vh 3.2vw; min-height: 100vh; display: flex; flex-direction: column; }
+  .b-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 2vh; }
+  .b-top .logo { color: #F4F2EE; font-size: clamp(18px, 2.2vw, 34px); }
+  .b-top .logo b { color: #5FD0D2; }
+  .b-ctl { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  body.board .btn { background: transparent; border-color: #3B4E58; color: #C9D1DB; }
+  body.board .btn:hover { border-color: #5FD0D2; color: #fff; }
+  body.board .btn.on { background: #5FD0D2; border-color: #5FD0D2; color: #12222B; }
+  .b-main { flex: 1; display: grid; grid-template-columns: minmax(220px, 26vw) 1fr; gap: 3.2vw; align-items: start; }
+  .b-join { background: #fff; color: var(--ink); border-radius: 22px; padding: 2vw; text-align: center; }
+  .b-join svg { width: 100%; height: auto; display: block; }
+  .b-join .how { font-weight: 800; font-size: clamp(15px, 1.5vw, 26px); margin: 1vh 0 .4vh; }
+  .b-join .url { color: var(--ink-2); font-size: clamp(12px, 1.05vw, 18px); word-break: break-all; }
+  .b-join .code { font-size: clamp(22px, 2.6vw, 44px); color: var(--brand-dark); }
+  .b-q { font-size: clamp(26px, 3.6vw, 64px); font-weight: 900; line-height: 1.2; letter-spacing: -.02em; margin: 0 0 2.4vh; }
+  .b-count { color: #9FB0BA; font-size: clamp(15px, 1.5vw, 26px); margin-bottom: 2.4vh; font-variant-numeric: tabular-nums; }
+  .b-count b { color: #FFC857; font-size: 1.5em; }
+  body.board .bar { margin-bottom: 2vh; }
+  body.board .bar .lab { font-size: clamp(17px, 1.9vw, 34px); }
+  body.board .bar .lab span:last-child { color: #C9D1DB; }
+  body.board .bar .track { height: clamp(18px, 2.6vh, 38px); background: #22363F; }
+  body.board .bar .fill { background: #5FD0D2; }
+  body.board .bar.lead .fill { background: #FFC857; }
+  .b-cmts { margin-top: 2.4vh; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 12px; }
+  body.board .cmt { background: #1B303A; border-left-color: #5FD0D2; font-size: clamp(15px, 1.35vw, 24px); margin: 0; }
+  body.board .cmt small { color: #9FB0BA; }
+  .b-closed { display: inline-block; padding: 4px 14px; border-radius: 999px; background: #B5402D; color: #fff; font-weight: 800; font-size: clamp(13px, 1.2vw, 20px); margin-left: 10px; vertical-align: middle; }
+  @media (max-width: 820px) { .b-main { grid-template-columns: 1fr; } .b-join { max-width: 300px; margin: 0 auto; } }
+  @media (prefers-reduced-motion: reduce) { .bar .fill { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="empty">불러오는 중…</p></div>
+<script src="config.js"></script>
+<script src="qrcode.js"></script>
+<script>
+/* 헤아림 HearI'm — 실시간 설문
+   참여: ?p=설문번호 (가입·설치 없음, 파이어베이스 SDK 없이 주소로 바로 읽고 씀 → 참여 인원이 많아도 가벼움)
+   결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
+   자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
+         users/{uid}/polls/{번호} = 만든 때 */
+const VERSION = '1.0.0';
+const CFG = window.HEARIM_CONFIG || null;
+const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
+const Q = new URLSearchParams(location.search);
+const $ = function(id){ return document.getElementById(id); };
+const app = $('app');
+const esc = function(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch){ return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]; }); };
+const n = function(v){ return Number(v || 0).toLocaleString('ko-KR'); };
+const CODE_RE = /^[a-z0-9]{6}$/;
+const ALPHA = 'abcdefghjkmnpqrstuvwxyz23456789';   // 헷갈리는 글자(i·l·o·0·1) 뺌
+const rnd = function(len, set){ const a = new Uint32Array(len); crypto.getRandomValues(a); let s = ''; for (let i = 0; i < len; i++) s += set[a[i] % set.length]; return s; };
+const BASE = location.origin + location.pathname;
+const joinUrl = function(code){ return BASE + '?p=' + code; };
+const boardUrl = function(code){ return BASE + '?b=' + code; };
+const ls = { get: function(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function(k, v){ try { localStorage.setItem(k, v); } catch (e) {} } };
+const optsOf = function(meta){ const o = meta && meta.opts; if (!o) return []; return (Array.isArray(o) ? o : Object.keys(o).sort().map(function(k){ return o[k]; })).filter(function(x){ return x != null; }); };
+const logo = '<a class="logo" href="' + esc(BASE) + '">헤아림<small>Hear<b>I&#39;m</b></small></a>';
+
+/* ---- 주소로 바로 읽고 쓰기 (참여 화면) ---- */
+function rest(path, opt){
+  return fetch(CFG.databaseURL.replace(/\/$/, '') + '/' + path + '.json', opt || {}).then(function(r){
+    return r.json().catch(function(){ return null; }).then(function(j){
+      if (!r.ok) { const e = new Error(j && j.error || ('HTTP ' + r.status)); e.status = r.status; throw e; }
+      return j;
+    });
+  });
+}
+
+/* ---- 표 세기 ---- */
+function tally(meta, votes){
+  const opts = optsOf(meta), counts = opts.map(function(){ return 0; }), cmts = [];
+  Object.keys(votes || {}).forEach(function(k){
+    const v = votes[k]; if (!v || typeof v.c !== 'number' || v.c < 0 || v.c >= opts.length) return;
+    counts[v.c]++; if (v.t && String(v.t).trim()) cmts.push({ t: String(v.t).trim(), c: v.c, at: v.at || 0 });
+  });
+  cmts.sort(function(a, b){ return b.at - a.at; });
+  const total = counts.reduce(function(a, b){ return a + b; }, 0);
+  return { opts: opts, counts: counts, total: total, max: Math.max.apply(null, counts.concat([0])), cmts: cmts };
+}
+function barsHtml(t){
+  return t.opts.map(function(o, i){
+    const c = t.counts[i], pct = t.total ? Math.round(c / t.total * 100) : 0;
+    return '<div class="bar' + (c > 0 && c === t.max ? ' lead' : '') + '"><div class="lab"><span>' + esc(o) + '</span><span>' + n(c) + '명 · ' + pct + '%</span></div><div class="track"><div class="fill" style="width:' + pct + '%"></div></div></div>';
+  }).join('');
+}
+
+/* ---- QR ---- */
+function qrSvg(text){
+  if (typeof qrcode !== 'function') return '';
+  const q = qrcode(0, 'M'); q.addData(text); q.make();
+  const c = q.getModuleCount(); let d = '';
+  for (let y = 0; y < c; y++) for (let x = 0; x < c; x++) if (q.isDark(y, x)) d += 'M' + x + ' ' + y + 'h1v1h-1z';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 ' + (c + 4) + ' ' + (c + 4) + '" shape-rendering="crispEdges" role="img" aria-label="참여 QR"><rect x="-2" y="-2" width="' + (c + 4) + '" height="' + (c + 4) + '" fill="#fff"/><path d="' + d + '" fill="#1F2933"/></svg>';
+}
+
+/* ---- 파이어베이스 SDK (만들기·결과 화면에서만 불러옴) ---- */
+let fbReady = null;
+function loadFb(){
+  if (fbReady) return fbReady;
+  const add = function(name){ return new Promise(function(ok, no){ const s = document.createElement('script'); s.src = FB_SDK + '/firebase-' + name + '-compat.js'; s.onload = ok; s.onerror = function(){ no(new Error('연결 도구를 불러오지 못했어요. 인터넷을 확인해 주세요.')); }; document.head.appendChild(s); }); };
+  fbReady = add('app').then(function(){ return Promise.all([add('auth'), add('database')]); }).then(function(){ if (!firebase.apps.length) firebase.initializeApp(CFG); return firebase; });
+  return fbReady;
+}
+
+/* ================= 참여 화면 ================= */
+function pageJoin(code){
+  document.title = '헤아림 · 참여';
+  app.innerHTML = '<div class="top">' + logo + '</div><div class="card" id="jc"><p class="empty">설문을 불러오는 중…</p></div>';
+  const box = $('jc');
+  const vidKey = 'ha_vid_' + code, doneKey = 'ha_done_' + code;
+  let vid = ls.get(vidKey); if (!/^[a-z0-9]{16}$/.test(vid || '')) { vid = rnd(16, 'abcdefghijklmnopqrstuvwxyz0123456789'); ls.set(vidKey, vid); }
+  let meta = null, pick = -1, prev = null;
+  try { prev = JSON.parse(ls.get(doneKey) || 'null'); } catch (e) {}
+
+  function form(){
+    const opts = optsOf(meta);
+    box.innerHTML = '<p class="hint">' + (prev ? '이미 낸 답을 바꿀 수 있어요' : '하나를 골라 주세요') + '</p><p class="q">' + esc(meta.q) + '</p>' +
+      opts.map(function(o, i){ return '<button type="button" class="opt' + (i === pick ? ' on' : '') + '" data-i="' + i + '" aria-pressed="' + (i === pick) + '"><span class="dot"></span><span>' + esc(o) + '</span></button>'; }).join('') +
+      (meta.ask ? '<label class="f" for="jt">한 줄 의견 <span class="hint" style="font-weight:400">(안 써도 돼요)</span></label><textarea id="jt" rows="2" maxlength="200" placeholder="고른 까닭이나 다른 생각">' + esc(prev && prev.t || '') + '</textarea>' : '') +
+      '<div id="jm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="js" style="flex:1"' + (pick < 0 ? ' disabled' : '') + '>' + (prev ? '바꿔서 내기' : '내기') + '</button></div>' +
+      '<p class="hint" style="margin:12px 0 0">이름 없이 익명으로 모여요.</p>';
+    box.querySelectorAll('.opt').forEach(function(b){ b.addEventListener('click', function(){ pick = Number(b.dataset.i); box.querySelectorAll('.opt').forEach(function(x){ const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); }); $('js').disabled = false; }); });
+    $('js').addEventListener('click', send);
+  }
+  function send(){
+    if (pick < 0) return;
+    const t = meta.ask && $('jt') ? $('jt').value.trim().slice(0, 200) : '';
+    const body = { c: pick, at: { '.sv': 'timestamp' } }; if (t) body.t = t;
+    $('js').disabled = true; $('jm').innerHTML = '<p class="hint">보내는 중…</p>';
+    rest('polls/' + code + '/votes/' + vid, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function(){ prev = { c: pick, t: t }; ls.set(doneKey, JSON.stringify(prev)); done(); })
+      .catch(function(e){
+        $('js').disabled = false;
+        // 마감된 설문은 규칙이 막음 — 다시 읽어서 마감인지 확인
+        rest('polls/' + code + '/meta').then(function(m){ if (m && m.open === false) { meta = m; closed(); } else $('jm').innerHTML = '<p class="msg bad">보내지 못했어요. 잠시 뒤 다시 눌러 주세요. (' + esc(e.message) + ')</p>'; })
+          .catch(function(){ $('jm').innerHTML = '<p class="msg bad">보내지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.</p>'; });
+      });
+  }
+  function resultBox(){
+    const r = $('jr'); if (!r) return;
+    r.innerHTML = '<p class="hint">결과를 불러오는 중…</p>';
+    rest('polls/' + code + '/votes').then(function(v){
+      const t = tally(meta, v);
+      r.innerHTML = '<p class="hint" style="margin:0 0 10px">지금까지 <b>' + n(t.total) + '명</b></p>' + barsHtml(t) + '<button type="button" class="btn sm" id="jre">결과 새로 보기</button>';
+      $('jre').addEventListener('click', resultBox);
+    }).catch(function(){ r.innerHTML = '<p class="hint">결과를 불러오지 못했어요.</p>'; });
+  }
+  function done(){
+    const opts = optsOf(meta);
+    box.innerHTML = '<h1>고마워요!</h1><p class="hint" style="margin:0 0 14px">고른 답: <b style="color:var(--ink)">' + esc(opts[prev.c] || '') + '</b></p>' +
+      (meta.res ? '<div id="jr"></div>' : '<p class="msg">결과는 앞의 큰 화면에서 볼 수 있어요.</p>') +
+      '<div class="row" style="margin-top:16px">' + (meta.open !== false ? '<button type="button" class="btn sm" id="jch">답 바꾸기</button>' : '') +
+      (meta.link && /^https:\/\//.test(meta.link) ? '<a class="btn main sm" href="' + esc(meta.link) + '" target="_blank" rel="noopener">' + esc(meta.linkLabel || '더 보기') + '</a>' : '') + '</div>';
+    if (meta.res) resultBox();
+    if ($('jch')) $('jch').addEventListener('click', function(){ pick = prev.c; form(); });
+  }
+  function closed(){
+    box.innerHTML = '<p class="q">' + esc(meta.q) + '</p><p class="msg bad">이 설문은 마감됐어요.</p>' + (meta.res ? '<div id="jr"></div>' : '') +
+      (meta.link && /^https:\/\//.test(meta.link) ? '<div class="row" style="margin-top:16px"><a class="btn main sm" href="' + esc(meta.link) + '" target="_blank" rel="noopener">' + esc(meta.linkLabel || '더 보기') + '</a></div>' : '');
+    if (meta.res) resultBox();
+  }
+  rest('polls/' + code + '/meta').then(function(m){
+    if (!m || !m.q) { box.innerHTML = '<p class="msg bad">설문을 찾지 못했어요. 번호를 다시 확인해 주세요.</p><a class="btn" href="' + esc(BASE) + '">처음으로</a>'; return; }
+    meta = m; document.title = '헤아림 · ' + m.q;
+    if (m.open === false) closed(); else if (prev) done(); else form();
+  }).catch(function(){ box.innerHTML = '<p class="msg bad">불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요.</p>'; });
+}
+
+/* ================= 결과 화면 (큰 화면) ================= */
+function pageBoard(code){
+  document.body.classList.add('board'); document.title = '헤아림 · 결과';
+  app.innerHTML = '<div class="b-top">' + logo + '<div class="b-ctl" id="bc"></div></div><div class="b-main"><div class="b-join" id="bj"></div><div id="bm"><p class="b-count">연결하는 중…</p></div></div>';
+  $('bj').innerHTML = qrSvg(joinUrl(code)) + '<p class="how">QR을 찍고 골라 주세요</p><p class="url">' + esc(joinUrl(code).replace(/^https?:\/\//, '')) + '</p><p class="hint" style="margin:.6vh 0 0">설문 번호</p><p class="code" style="margin:0">' + esc(code) + '</p>';
+  let meta = null, votes = null, uid = '', showCm = ls.get('ha_cm_' + code) !== '0', db = null;
+  function draw(){
+    const m = $('bm'); if (!m) return;
+    if (!meta) { m.innerHTML = '<p class="b-q">설문을 찾지 못했어요</p><p class="b-count">번호를 다시 확인해 주세요.</p>'; return; }
+    const t = tally(meta, votes), owner = uid && meta.owner === uid;
+    m.innerHTML = '<p class="b-q">' + esc(meta.q) + (meta.open === false ? '<span class="b-closed">마감</span>' : '') + '</p><p class="b-count"><b>' + n(t.total) + '</b> 명이 답했어요</p>' + barsHtml(t) +
+      (meta.ask && showCm && t.cmts.length ? '<div class="b-cmts">' + t.cmts.slice(0, 12).map(function(c){ return '<div class="cmt">' + esc(c.t) + '<small>' + esc(t.opts[c.c] || '') + '</small></div>'; }).join('') + '</div>' : '');
+    $('bc').innerHTML = (meta.ask ? '<button type="button" class="btn sm' + (showCm ? ' on' : '') + '" id="bcm">한 줄 의견 ' + (showCm ? '보임' : '숨김') + '</button>' : '') +
+      (owner ? '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? '다시 받기' : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' : '') +
+      '<button type="button" class="btn sm" id="bfs">전체 화면</button>';
+    if ($('bcm')) $('bcm').addEventListener('click', function(){ showCm = !showCm; ls.set('ha_cm_' + code, showCm ? '1' : '0'); draw(); });
+    $('bfs').addEventListener('click', function(){ const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function(){}); });
+    if ($('bop')) $('bop').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(meta.open === false); });
+    if ($('bcl')) armed($('bcl'), '한 번 더 누르면 지워요', function(){ db.ref('polls/' + code + '/votes').remove(); });
+  }
+  loadFb().then(function(fb){
+    db = fb.database();
+    fb.auth().onAuthStateChanged(function(u){ uid = u ? u.uid : ''; if (meta) draw(); });
+    db.ref('polls/' + code + '/meta').on('value', function(s){ meta = s.val(); draw(); });
+    db.ref('polls/' + code + '/votes').on('value', function(s){ votes = s.val(); if (meta) draw(); });
+  }).catch(function(e){ $('bm').innerHTML = '<p class="b-q">연결하지 못했어요</p><p class="b-count">' + esc(e.message) + '</p>'; });
+}
+// 지우기처럼 되돌릴 수 없는 단추: 한 번 누르면 색이 바뀌고, 3초 안에 한 번 더 눌러야 실행
+function armed(btn, text, run){
+  const orig = btn.textContent; let t = 0;
+  btn.addEventListener('click', function(){
+    if (btn.classList.contains('armed')) { clearTimeout(t); btn.classList.remove('armed'); btn.textContent = orig; run(); return; }
+    btn.classList.add('armed'); btn.textContent = text;
+    t = setTimeout(function(){ btn.classList.remove('armed'); btn.textContent = orig; }, 3000);
+  });
+}
+
+/* ================= 첫 화면 · 만들기 ================= */
+function pageHome(){
+  app.innerHTML = '<div class="top">' + logo + '</div>' +
+    '<div class="card"><h1>여러분의 생각, 듣고 있어요</h1><p class="hint" style="margin:0 0 14px">QR을 찍고 고르면 결과가 바로 화면에 올라와요. 참여하는 사람은 가입도 설치도 필요 없어요.</p>' +
+    '<label class="f" for="hc" style="margin-top:0">설문 번호로 참여하기</label><div class="row"><input type="text" id="hc" class="code" inputmode="latin" autocapitalize="none" autocomplete="off" maxlength="6" placeholder="예: k7m2pq" style="flex:1; min-width:0; text-transform:lowercase"><button type="button" class="btn main" id="hg">들어가기</button></div><div id="hm"></div></div>' +
+    '<div class="card" id="mk"><h2>설문 만들기</h2><p class="hint">연결하는 중…</p></div>' +
+    '<p class="hint" style="text-align:center">헤아림 HearI&#39;m ' + VERSION + ' · 만든 사람 음악적체육인</p>';
+  const go = function(){ const c = $('hc').value.trim().toLowerCase(); if (!CODE_RE.test(c)) { $('hm').innerHTML = '<p class="msg bad">번호는 영어 소문자와 숫자 6자리예요.</p>'; return; } location.href = joinUrl(c); };
+  $('hg').addEventListener('click', go); $('hc').addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
+  const mk = $('mk'); let fb = null, db = null, user = null;
+  loadFb().then(function(f){
+    fb = f; db = f.database();
+    f.auth().onAuthStateChanged(function(u){ user = u; if (u) maker(); else login(); });
+  }).catch(function(e){ mk.innerHTML = '<h2>설문 만들기</h2><p class="msg bad">' + esc(e.message) + '</p>'; });
+
+  function login(){
+    mk.innerHTML = '<h2>설문 만들기</h2><p class="hint" style="margin:0 0 12px">만든 설문을 다시 찾을 수 있게 구글 계정으로 로그인해요. 참여하는 사람은 로그인하지 않아요.</p><button type="button" class="btn main" id="lg">구글로 로그인</button><div id="lm"></div>';
+    $('lg').addEventListener('click', function(){
+      fb.auth().signInWithPopup(new fb.auth.GoogleAuthProvider()).catch(function(e){ $('lm').innerHTML = '<p class="msg bad">로그인하지 못했어요. (' + esc(e && e.message || e) + ')</p>'; });
+    });
+  }
+  function maker(){
+    mk.innerHTML = '<div class="row" style="justify-content:space-between; margin-bottom:6px"><h2 style="margin:0">설문 만들기</h2><button type="button" class="btn sm" id="lo">로그아웃</button></div>' +
+      '<label class="f" for="mq">질문</label><textarea id="mq" rows="2" maxlength="200" placeholder="예: 체육 시간에 가장 하고 싶은 것은?"></textarea>' +
+      '<label class="f">보기 <span class="hint" style="font-weight:400">(2~6개)</span></label><div id="mo"></div><button type="button" class="btn sm" id="ma">보기 더하기</button>' +
+      '<label class="chk"><input type="checkbox" id="mask" checked><span>한 줄 의견도 받기</span></label>' +
+      '<label class="chk"><input type="checkbox" id="mres" checked><span>답을 낸 사람에게 결과 보여 주기</span></label>' +
+      '<label class="f" for="ml">끝나고 보여 줄 주소 <span class="hint" style="font-weight:400">(안 써도 돼요)</span></label><input type="text" id="ml" inputmode="url" autocapitalize="none" placeholder="https://"><input type="text" id="mll" maxlength="30" placeholder="단추에 쓸 말 (예: 자료 보러 가기)" style="margin-top:8px">' +
+      '<div id="mm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="mc">설문 만들기</button></div>' +
+      '<h2 style="margin:26px 0 10px">내가 만든 설문</h2><div id="my"><p class="hint">불러오는 중…</p></div>';
+    const mo = $('mo');
+    const addOpt = function(v){ if (mo.children.length >= 6) return; const d = document.createElement('div'); d.className = 'row'; d.style.marginBottom = '8px'; d.innerHTML = '<input type="text" maxlength="60" placeholder="보기 ' + (mo.children.length + 1) + '" style="flex:1; min-width:0"><button type="button" class="btn sm" aria-label="이 보기 빼기">빼기</button>'; d.querySelector('input').value = v || ''; d.querySelector('button').addEventListener('click', function(){ if (mo.children.length > 2) { d.remove(); renum(); } }); mo.appendChild(d); renum(); };
+    const renum = function(){ Array.prototype.forEach.call(mo.children, function(d, i){ d.querySelector('input').placeholder = '보기 ' + (i + 1); }); $('ma').disabled = mo.children.length >= 6; };
+    addOpt(); addOpt();
+    $('ma').addEventListener('click', function(){ addOpt(); });
+    $('lo').addEventListener('click', function(){ fb.auth().signOut(); });
+    $('mc').addEventListener('click', create);
+    list();
+  }
+  function create(){
+    const q = $('mq').value.trim(), opts = Array.prototype.map.call($('mo').querySelectorAll('input'), function(i){ return i.value.trim(); }).filter(Boolean);
+    const link = $('ml').value.trim(), label = $('mll').value.trim(), bad = function(t){ $('mm').innerHTML = '<p class="msg bad">' + t + '</p>'; };
+    if (!q) return bad('질문을 적어 주세요.');
+    if (opts.length < 2) return bad('보기를 2개 넘게 적어 주세요.');
+    if (link && !/^https:\/\/\S+$/.test(link)) return bad('주소는 https:// 로 시작해야 해요.');
+    const meta = { owner: user.uid, q: q.slice(0, 200), opts: opts.map(function(o){ return o.slice(0, 60); }), open: true, ask: $('mask').checked, res: $('mres').checked, at: Date.now() };
+    if (link) { meta.link = link.slice(0, 300); if (label) meta.linkLabel = label.slice(0, 30); }
+    $('mc').disabled = true; $('mm').innerHTML = '<p class="hint">만드는 중…</p>';
+    const attempt = function(left){
+      const code = rnd(6, ALPHA);
+      // 이미 있는 번호면 규칙이 막음 → 다른 번호로 다시
+      return db.ref('polls/' + code + '/meta').set(meta).then(function(){ return db.ref('users/' + user.uid + '/polls/' + code).set(meta.at).then(function(){ return code; }); })
+        .catch(function(e){ if (left > 0) return attempt(left - 1); throw e; });
+    };
+    attempt(4).then(function(code){ $('mm').innerHTML = '<p class="msg">만들었어요. 결과 화면을 열어 QR을 보여 주세요.</p>'; $('mc').disabled = false; $('mq').value = ''; Array.prototype.forEach.call($('mo').querySelectorAll('input'), function(i){ i.value = ''; }); list(code); })
+      .catch(function(e){ $('mc').disabled = false; bad('만들지 못했어요. (' + esc(e && e.message || e) + ')'); });
+  }
+  function list(fresh){
+    const my = $('my'); if (!my) return;
+    db.ref('users/' + user.uid + '/polls').once('value').then(function(s){
+      const codes = Object.keys(s.val() || {}).filter(function(c){ return CODE_RE.test(c); }).sort(function(a, b){ return (s.val()[b] || 0) - (s.val()[a] || 0); });
+      if (!codes.length) { my.innerHTML = '<p class="empty">아직 만든 설문이 없어요.</p>'; return; }
+      return Promise.all(codes.map(function(c){ return db.ref('polls/' + c).once('value').then(function(p){ return { code: c, v: p.val() }; }); })).then(function(rows){
+        my.innerHTML = rows.map(function(r){
+          if (!r.v || !r.v.meta) return '';
+          const m = r.v.meta, t = tally(m, r.v.votes);
+          return '<div class="poll" data-code="' + r.code + '"' + (r.code === fresh ? ' style="border-color:var(--brand)"' : '') + '><h3>' + esc(m.q) + '</h3><p class="hint" style="margin:0 0 10px"><span class="tag' + (m.open === false ? ' off' : '') + '">' + (m.open === false ? '마감' : '받는 중') + '</span> 번호 <span class="code">' + r.code + '</span> · 답 ' + n(t.total) + '명</p>' +
+            '<div class="row"><a class="btn main sm" href="' + esc(boardUrl(r.code)) + '" target="_blank" rel="noopener">결과 화면 열기</a><button type="button" class="btn sm" data-act="copy">참여 주소 복사</button><button type="button" class="btn sm" data-act="open">' + (m.open === false ? '다시 받기' : '마감하기') + '</button><button type="button" class="btn sm" data-act="csv">답 내려받기</button><button type="button" class="btn sm danger" data-act="del">지우기</button></div></div>';
+        }).join('') || '<p class="empty">아직 만든 설문이 없어요.</p>';
+        my.querySelectorAll('.poll').forEach(function(el){
+          const code = el.dataset.code, row = rows.filter(function(r){ return r.code === code; })[0], m = row.v.meta;
+          el.querySelector('[data-act=copy]').addEventListener('click', function(e){ const b = e.currentTarget, ok = function(){ b.textContent = '복사했어요'; setTimeout(function(){ b.textContent = '참여 주소 복사'; }, 1500); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(joinUrl(code)).then(ok, function(){ prompt('참여 주소', joinUrl(code)); }); else prompt('참여 주소', joinUrl(code)); });
+          el.querySelector('[data-act=open]').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(m.open === false).then(function(){ list(); }); });
+          el.querySelector('[data-act=csv]').addEventListener('click', function(){ csv(code, m, row.v.votes); });
+          armed(el.querySelector('[data-act=del]'), '한 번 더 누르면 지워요', function(){
+            // 답을 먼저 지우고(주인만 가능) 설문을 지움
+            db.ref('polls/' + code + '/votes').remove().then(function(){ return db.ref('polls/' + code + '/meta').remove(); }).then(function(){ return db.ref('users/' + user.uid + '/polls/' + code).remove(); }).then(function(){ list(); });
+          });
+        });
+      });
+    }).catch(function(e){ my.innerHTML = '<p class="msg bad">불러오지 못했어요. (' + esc(e && e.message || e) + ')</p>'; });
+  }
+  function csv(code, meta, votes){
+    const opts = optsOf(meta), q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    const rows = Object.keys(votes || {}).map(function(k){ return votes[k]; }).filter(function(v){ return v && typeof v.c === 'number'; }).sort(function(a, b){ return (a.at || 0) - (b.at || 0); })
+      .map(function(v){ return [new Date(v.at || 0).toLocaleString('ko-KR'), opts[v.c] || '', v.t || ''].map(q).join(','); });
+    const text = '﻿' + ['때', '고른 보기', '한 줄 의견'].map(q).join(',') + '\n' + rows.join('\n') + '\n';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' })); a.download = '헤아림_' + code + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+  }
+}
+
+/* ---- 시작 ---- */
+(function(){
+  if (!CFG || !CFG.databaseURL) { app.innerHTML = '<div class="top">' + logo + '</div><div class="card"><h1>아직 연결 전이에요</h1><p class="hint">파이어베이스 연결 정보(config.js)를 넣으면 쓸 수 있어요.</p></div>'; return; }
+  const p = (Q.get('p') || '').toLowerCase(), b = (Q.get('b') || '').toLowerCase();
+  if (CODE_RE.test(b)) pageBoard(b); else if (CODE_RE.test(p)) pageJoin(p); else pageHome();
+})();
+</script>
+</body>
+</html>
