@@ -163,7 +163,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const MAX_POLLS = 30;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -418,6 +418,10 @@ function pageJoin(code){
     if ($('jch')) $('jch').addEventListener('click', function(){ pick = prev.c; form(); });
   }
   function closed(){
+    if (meta.wait) {
+      box.innerHTML = step() + '<p class="q">' + esc(meta.q) + '</p><p class="msg">아직 열리지 않은 질문이에요. 선생님이 큰 화면에 이 질문을 띄우면 다시 눌러 주세요.</p><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="jrl" style="flex:1">다시 확인하기</button></div>';
+      $('jrl').addEventListener('click', function(){ location.reload(); }); return;
+    }
     box.innerHTML = '<p class="q">' + esc(meta.q) + '</p><p class="msg bad">이 설문은 마감됐어요.</p>' + (meta.res ? '<div id="jr"></div>' : '') +
       (tail() ? '<div class="row" style="margin-top:16px">' + tail() + '</div>' : '') + wait();
     if (meta.res) resultBox();
@@ -435,7 +439,7 @@ function pageBoard(code){
   app.innerHTML = '<div class="b-top">' + logo + '<div class="b-ctl" id="bc"></div></div><div class="b-main"><div class="b-join" id="bj"></div><div id="bm"><p class="b-count">연결하는 중…</p></div></div><button type="button" class="btn sm b-exit" id="bx">발표 모드 끝내기</button>';
   const setJoin = function(){ $('bj').innerHTML = qrSvg(joinUrl(code)) + '<p class="how" id="bhow">QR을 찍고 골라 주세요</p><p class="url">' + esc(joinUrl(code).replace(/^https?:\/\//, '')) + '</p><p class="hint" style="margin:.6vh 0 0">설문 번호</p><p class="code" style="margin:0">' + esc(code) + '</p><div class="b-nav" id="bnv"></div>'; };
   setJoin();
-  let meta = null, votes = null, uid = '', showCm = ls.get('ha_cm_' + code) !== '0', db = null, mref = null, vref = null;
+  let meta = null, votes = null, uid = '', showCm = ls.get('ha_cm_' + code) !== '0', db = null, mref = null, vref = null, autoOpen = false;
   // 묶음: 쪽 넘기기 (화면을 새로 열지 않고 그 자리에서 다음 질문으로 바꿈 — 전체 화면이 풀리지 않게)
   const attach = function(){
     const my = code; mref = db.ref('polls/' + code + '/meta'); vref = db.ref('polls/' + code + '/votes');
@@ -444,11 +448,12 @@ function pageBoard(code){
   };
   const swap = function(nc){
     if (!db || !mref || nc === code || !CODE_RE.test(nc)) return;
-    mref.off(); vref.off(); code = nc; meta = null; votes = null; flOpen = false; flSet = false; showCm = ls.get('ha_cm_' + code) !== '0';
+    mref.off(); vref.off(); autoOpen = true; code = nc; meta = null; votes = null; flOpen = false; flSet = false; showCm = ls.get('ha_cm_' + code) !== '0';
     setJoin(); $('bm').innerHTML = '<p class="b-count">불러오는 중…</p>';
     try { const u = new URL(location.href); u.searchParams.set('b', code); history.replaceState(null, '', u.toString()); } catch (e) {}
     attach();
   };
+  const openToggle = function(){ const to = meta.open === false; db.ref('polls/' + code + '/meta/open').set(to); if (to && meta.wait) db.ref('polls/' + code + '/meta/wait').remove(); };
   const turn = function(d){ const sb = sibOf(meta), i = sb.indexOf(code); if (i >= 0 && sb[i + d]) swap(sb[i + d]); };
   const nav = function(){
     const el = $('bnv'), sb = sibOf(meta), i = sb.indexOf(code); if (!el) return;
@@ -469,17 +474,19 @@ function pageBoard(code){
     const m = $('bm'); if (!m) return;
     if (!meta) { m.innerHTML = '<p class="b-q">설문을 찾지 못했어요</p><p class="b-count">번호를 다시 확인해 주세요.</p>'; return; }
     nav();
+    // 만든 사람이 쪽을 넘겨서 온 질문이 대기 중이면 그때 엶
+    if (autoOpen && uid && meta.owner === uid) { autoOpen = false; if (meta.wait && meta.open === false) openToggle(); }
     if (isText(meta)) return drawText();
     const t = tally(meta, votes), owner = uid && meta.owner === uid;
-    m.innerHTML = '<p class="b-q">' + esc(meta.q) + (meta.open === false ? '<span class="b-closed">마감</span>' : '') + '</p><p class="b-count"><b>' + n(t.total) + '</b> 명이 답했어요</p>' + barsHtml(t) +
+    m.innerHTML = '<p class="b-q">' + esc(meta.q) + (meta.open === false ? '<span class="b-closed">' + (meta.wait ? '아직 열기 전' : '마감') + '</span>' : '') + '</p><p class="b-count"><b>' + n(t.total) + '</b> 명이 답했어요</p>' + barsHtml(t) +
       (meta.ask && showCm && t.cmts.length ? '<div class="b-cmts">' + t.cmts.slice(0, 12).map(function(c){ return '<div class="cmt">' + esc(c.t) + '<small>' + esc(t.opts[c.c] || '') + '</small></div>'; }).join('') + '</div>' : '');
     $('bc').innerHTML = (meta.ask ? '<button type="button" class="btn sm' + (showCm ? ' on' : '') + '" id="bcm">한 줄 의견 ' + (showCm ? '보임' : '숨김') + '</button>' : '') +
-      (owner ? '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? '다시 받기' : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' : '') +
+      (owner ? '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? (meta.wait ? '이 질문 열기' : '다시 받기') : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' : '') +
       '<button type="button" class="btn sm" id="bsh">발표 모드</button><button type="button" class="btn sm" id="bfs">전체 화면</button>';
     $('bsh').addEventListener('click', function(){ setShow(true); });
     if ($('bcm')) $('bcm').addEventListener('click', function(){ showCm = !showCm; ls.set('ha_cm_' + code, showCm ? '1' : '0'); draw(); });
     $('bfs').addEventListener('click', function(){ const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function(){}); });
-    if ($('bop')) $('bop').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(meta.open === false); });
+    if ($('bop')) $('bop').addEventListener('click', openToggle);
     if ($('bcl')) armed($('bcl'), '한 번 더 누르면 지워요', function(){ db.ref('polls/' + code + '/votes').remove(); });
   }
   // 적어서 내기: 답 구름. 주인은 글자를 눌러 숨길 수 있음
@@ -493,18 +500,18 @@ function pageBoard(code){
       t.flagged.map(function(it){ return '<div class="row"><span>' + esc(it.label) + ' · ' + n(it.count) + '명</span><span class="row" style="margin:0; gap:6px"><button type="button" class="btn sm" data-k="' + esc(it.key) + '" data-a="show">' + (t.mod ? '띄우기' : '보이기') + '</button>' + (t.mod ? '<button type="button" class="btn sm" data-k="' + esc(it.key) + '" data-a="drop">버리기</button>' : '') + '</span></div>'; }).join('') + '</div>' : '';
     $('bfl').querySelectorAll('button[data-k]').forEach(function(b){ b.addEventListener('click', function(){ db.ref('polls/' + code + '/meta/hide').set(hideOf(meta).concat([(b.dataset.a === 'show' ? '+' : '') + b.dataset.k]).slice(-300)); }); });
     if ($('ball')) $('ball').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/hide').set(hideOf(meta).concat(t.flagged.map(function(it){ return '+' + it.key; })).slice(-300)); });
-    $('bq').innerHTML = esc(meta.q) + (meta.open === false ? '<span class="b-closed">마감</span>' : '');
+    $('bq').innerHTML = esc(meta.q) + (meta.open === false ? '<span class="b-closed">' + (meta.wait ? '아직 열기 전' : '마감') + '</span>' : '');
     $('bn').innerHTML = '<b>' + n(t.total) + '</b> 명이 적었어요' + (t.items.length ? ' · 서로 다른 답 ' + n(t.items.length) + '개' : '');
     $('bhow').textContent = 'QR을 찍고 적어 주세요';
     $('bw').classList.toggle('own', owner);
     cloudUpdate($('bw'), t, function(key){ if (!(uid && meta && meta.owner === uid)) return; db.ref('polls/' + code + '/meta/hide').set(hideOf(meta).concat([key]).slice(-300)); });
-    $('bc').innerHTML = (owner ? (t.flagged.length ? '<button type="button" class="btn sm" id="bfb" aria-expanded="' + flOpen + '">' + (t.mod ? '확인할 답 ' : '걸러진 답 ') + t.flagged.length + '개</button>' : '') + (hn ? '<button type="button" class="btn sm" id="bun">숨긴 답 ' + hn + '개 되살리기</button>' : '') + '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? '다시 받기' : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' : '') +
+    $('bc').innerHTML = (owner ? (t.flagged.length ? '<button type="button" class="btn sm" id="bfb" aria-expanded="' + flOpen + '">' + (t.mod ? '확인할 답 ' : '걸러진 답 ') + t.flagged.length + '개</button>' : '') + (hn ? '<button type="button" class="btn sm" id="bun">숨긴 답 ' + hn + '개 되살리기</button>' : '') + '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? (meta.wait ? '이 질문 열기' : '다시 받기') : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' : '') +
       '<button type="button" class="btn sm" id="bsh">발표 모드</button><button type="button" class="btn sm" id="bfs">전체 화면</button>';
     $('bsh').addEventListener('click', function(){ setShow(true); });
     $('bfs').addEventListener('click', function(){ const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function(){}); });
     if ($('bfb')) $('bfb').addEventListener('click', function(){ flOpen = !flOpen; drawText(); });
     if ($('bun')) $('bun').addEventListener('click', function(){ const r = db.ref('polls/' + code + '/meta/hide'); if (plus.length) r.set(plus); else r.remove(); });
-    if ($('bop')) $('bop').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(meta.open === false); });
+    if ($('bop')) $('bop').addEventListener('click', openToggle);
     if ($('bcl')) armed($('bcl'), '한 번 더 누르면 지워요', function(){ db.ref('polls/' + code + '/votes').remove(); });
   }
   let rz = 0; window.addEventListener('resize', function(){ clearTimeout(rz); rz = setTimeout(function(){ if (meta && isText(meta)) drawText(); }, 200); });
@@ -555,7 +562,7 @@ function pageHome(){
       '<div id="mpk"><label class="f">보기 <span class="hint" style="font-weight:400">(2~6개)</span></label><div id="mo"></div><button type="button" class="btn sm" id="ma">보기 더하기</button>' +
       '<label class="chk"><input type="checkbox" id="mask" checked><span>한 줄 의견도 받기</span></label></div>' +
       '<div id="mtx" hidden><label class="f" for="mmx">한 사람이 낼 수 있는 답</label><select id="mmx"><option value="1">1개</option><option value="2">2개까지</option><option value="3">3개까지</option><option value="4">4개까지</option><option value="5">5개까지</option></select><p class="hint" style="margin:8px 0 0">답은 20자까지 받고, 글자와 숫자만 남겨요(기호는 빠져요). 적은 답은 결과 화면에 그대로 뜨고, 만든 사람은 글자를 눌러 숨길 수 있어요.</p><label class="chk"><input type="checkbox" id="mmod"><span>확인한 뒤 띄우기 <span class="hint">(내가 띄운 답만 결과 화면에 나와요)</span></span></label></div>' +
-      '<div id="mfw" hidden><label class="f" for="mfl">다음 질문으로 넘어가는 방식</label><select id="mfl"><option value="self">답을 내면 스스로 다음 질문으로</option><option value="with">선생님이 쪽을 넘기면 그 QR을 다시 찍기</option></select></div>' +
+      '<div id="mfw" hidden><label class="f" for="mfl">다음 질문으로 넘어가는 방식</label><select id="mfl"><option value="self">답을 내면 스스로 다음 질문으로</option><option value="with">선생님이 쪽을 넘기면 그 QR을 다시 찍기</option></select><p class="hint" style="margin:8px 0 0">선생님과 함께로 하면 뒤 질문은 닫혀 있다가, 결과 화면에서 그 쪽으로 넘길 때 열려요. 앞 질문은 계속 열려 있어요.</p></div>' +
       '<label class="chk"><input type="checkbox" id="mres" checked><span>답을 낸 사람에게 결과 보여 주기</span></label>' +
       '<label class="f" for="ml">끝나고 보여 줄 주소 <span class="hint" style="font-weight:400">(안 써도 돼요)</span></label><input type="text" id="ml" inputmode="url" autocapitalize="none" placeholder="https://"><input type="text" id="mll" maxlength="30" placeholder="단추에 쓸 말 (예: 자료 보러 가기)" style="margin-top:8px">' +
       '<div id="mm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="mc">설문 만들기</button><button type="button" class="btn" id="mx" hidden>그만두기</button></div>';
@@ -599,6 +606,17 @@ function pageHome(){
     $('mc').addEventListener('click', create);
     list();
   }
+  // 선생님과 함께: 둘째 질문부터는 닫아 두고(대기) 결과 화면에서 그 쪽으로 넘길 때 열림. 이미 답이 있는 질문은 그대로 둠
+  // 스스로: 대기 중이던 질문을 모두 엶
+  function applyFlow(sb, flow){
+    return Promise.all(sb.map(function(c, i){ return db.ref('polls/' + c).once('value').then(function(p){
+      const v = p.val(); if (!v || !v.meta) return null;
+      const w = [db.ref('polls/' + c + '/meta/flow').set(flow)], has = v.votes && Object.keys(v.votes).length;
+      if (flow === 'with' && i > 0 && !has && v.meta.open !== false) { w.push(db.ref('polls/' + c + '/meta/open').set(false)); w.push(db.ref('polls/' + c + '/meta/wait').set(true)); }
+      if (flow !== 'with' && v.meta.wait) { w.push(db.ref('polls/' + c + '/meta/open').set(true)); w.push(db.ref('polls/' + c + '/meta/wait').remove()); }
+      return Promise.all(w);
+    }); }));
+  }
   function create(){
     const q = $('mq').value.trim(), opts = Array.prototype.map.call($('mo').querySelectorAll('input'), function(i){ return i.value.trim(); }).filter(Boolean);
     const isT = $('mt1').checked;
@@ -614,10 +632,10 @@ function pageHome(){
     if (editing) {
       const code = editing.code, old = editing.meta, nm = { owner: old.owner, q: meta.q, opts: meta.opts, open: old.open !== false, ask: meta.ask, res: meta.res, at: old.at };
       if (isT) { delete nm.opts; nm.type = 'text'; nm.max = meta.max; if (meta.mod) nm.mod = true; if (hideOf(old).length) nm.hide = hideOf(old); }
-      const osb = sibOf(old); if (osb.length > 1) { nm.sib = osb; nm.flow = flow; }
+      const osb = sibOf(old); if (osb.length > 1) { nm.sib = osb; nm.flow = flow; } if (old.wait) nm.wait = true;
       if (meta.link) { nm.link = meta.link; if (meta.linkLabel) nm.linkLabel = meta.linkLabel; }
       $('mc').disabled = true; $('mm').innerHTML = '<p class="hint">저장하는 중…</p>';
-      db.ref('polls/' + code + '/meta').set(nm).then(function(){ return Promise.all(osb.length > 1 ? osb.filter(function(c){ return c !== code; }).map(function(c){ return db.ref('polls/' + c + '/meta/flow').set(flow); }) : []); }).then(function(){ $('mc').disabled = false; form.reset(); $('mm').innerHTML = '<p class="msg">고쳤어요. 열려 있는 결과 화면에도 바로 바뀌어요.</p>'; list(code); })
+      db.ref('polls/' + code + '/meta').set(nm).then(function(){ return osb.length > 1 ? applyFlow(osb, flow) : null; }).then(function(){ $('mc').disabled = false; form.reset(); $('mm').innerHTML = '<p class="msg">고쳤어요. 열려 있는 결과 화면에도 바로 바뀌어요.</p>'; list(code); })
         .catch(function(e){ $('mc').disabled = false; bad('고치지 못했어요. (' + esc(e && e.message || e) + ')'); });
       return;
     }
@@ -635,7 +653,7 @@ function pageHome(){
     attempt(4).then(function(code){
       // 잇기: 먼저 있던 질문들에도 새 순서와 넘어가는 방식을 적어 둠
       if (!ap) return code;
-      return Promise.all(ap.base.map(function(c){ return Promise.all([db.ref('polls/' + c + '/meta/sib').set(meta.sib), db.ref('polls/' + c + '/meta/flow').set(ap.flow)]); })).then(function(){ const cnt = meta.sib.length; form.reset(); $('mm').innerHTML = '<p class="msg">이었어요. 질문 ' + cnt + '개가 한 묶음이에요.</p>'; $('mc').disabled = false; list(code); throw { done: true }; });
+      return Promise.all(ap.base.map(function(c){ return Promise.all([db.ref('polls/' + c + '/meta/sib').set(meta.sib), db.ref('polls/' + c + '/meta/flow').set(ap.flow)]); })).then(function(){ return applyFlow(meta.sib, ap.flow); }).then(function(){ const cnt = meta.sib.length; form.reset(); $('mm').innerHTML = '<p class="msg">이었어요. 질문 ' + cnt + '개가 한 묶음이에요.</p>'; $('mc').disabled = false; list(code); throw { done: true }; });
     }).then(function(code){ $('mm').innerHTML = '<p class="msg">만들었어요. 결과 화면을 열어 QR을 보여 주세요.</p>'; $('mc').disabled = false; $('mq').value = ''; Array.prototype.forEach.call($('mo').querySelectorAll('input'), function(i){ i.value = ''; }); list(code); })
       .catch(function(e){ if (e && e.done) return; $('mc').disabled = false; bad('만들지 못했어요. (' + esc(e && e.message || e) + ')'); });
   }
@@ -652,14 +670,14 @@ function pageHome(){
         my.innerHTML = rows.map(function(r){
           if (!r.v || !r.v.meta) return '';
           const m = r.v.meta, t = isText(m) ? tallyText(m, r.v.votes) : tally(m, r.v.votes);
-          return '<div class="poll" data-code="' + r.code + '"' + (r.code === fresh ? ' style="border-color:var(--brand)"' : '') + '><h3>' + esc(m.q) + '</h3><p class="hint" style="margin:0 0 10px"><span class="tag' + (m.open === false ? ' off' : '') + '">' + (m.open === false ? '마감' : '받는 중') + '</span> 번호 <span class="code">' + r.code + '</span> · 답 ' + n(t.total) + '명' + (isText(m) ? ' · 적어서 내기' : '') + (r.n > 1 ? ' · <b>묶음 ' + (r.i + 1) + '/' + r.n + '</b>' : '') + '</p>' +
-            '<div class="row"><a class="btn main sm" href="' + esc(boardUrl(r.code)) + '" target="_blank" rel="noopener">결과 화면 열기</a><button type="button" class="btn sm" data-act="copy">참여 주소 복사</button><button type="button" class="btn sm" data-act="edit">고치기</button>' + (r.n < 2 || r.i === r.n - 1 ? '<button type="button" class="btn sm" data-act="add">질문 잇기</button>' : '') + '<button type="button" class="btn sm" data-act="open">' + (m.open === false ? '다시 받기' : '마감하기') + '</button><button type="button" class="btn sm" data-act="csv">답 내려받기</button><button type="button" class="btn sm danger" data-act="del">지우기</button></div></div>';
+          return '<div class="poll" data-code="' + r.code + '"' + (r.code === fresh ? ' style="border-color:var(--brand)"' : '') + '><h3>' + esc(m.q) + '</h3><p class="hint" style="margin:0 0 10px"><span class="tag' + (m.open === false ? ' off' : '') + '">' + (m.open === false ? (m.wait ? '대기' : '마감') : '받는 중') + '</span> 번호 <span class="code">' + r.code + '</span> · 답 ' + n(t.total) + '명' + (isText(m) ? ' · 적어서 내기' : '') + (r.n > 1 ? ' · <b>묶음 ' + (r.i + 1) + '/' + r.n + '</b>' : '') + '</p>' +
+            '<div class="row"><a class="btn main sm" href="' + esc(boardUrl(r.code)) + '" target="_blank" rel="noopener">결과 화면 열기</a><button type="button" class="btn sm" data-act="copy">참여 주소 복사</button><button type="button" class="btn sm" data-act="edit">고치기</button>' + (r.n < 2 || r.i === r.n - 1 ? '<button type="button" class="btn sm" data-act="add">질문 잇기</button>' : '') + '<button type="button" class="btn sm" data-act="open">' + (m.open === false ? (m.wait ? '열기' : '다시 받기') : '마감하기') + '</button><button type="button" class="btn sm" data-act="csv">답 내려받기</button><button type="button" class="btn sm danger" data-act="del">지우기</button></div></div>';
         }).join('') || '<p class="empty">아직 만든 설문이 없어요.</p>';
         my.querySelectorAll('.poll').forEach(function(el){
           const code = el.dataset.code, row = rows.filter(function(r){ return r.code === code; })[0], m = row.v.meta;
           el.querySelector('[data-act=copy]').addEventListener('click', function(e){ const b = e.currentTarget, ok = function(){ b.textContent = '복사했어요'; setTimeout(function(){ b.textContent = '참여 주소 복사'; }, 1500); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(joinUrl(code)).then(ok, function(){ prompt('참여 주소', joinUrl(code)); }); else prompt('참여 주소', joinUrl(code)); });
           el.querySelector('[data-act=edit]').addEventListener('click', function(){ form.fill(code, m, tally(m, row.v.votes).total); });
-          el.querySelector('[data-act=open]').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(m.open === false).then(function(){ list(); }); });
+          el.querySelector('[data-act=open]').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(m.open === false).then(function(){ return m.open === false && m.wait ? db.ref('polls/' + code + '/meta/wait').remove() : null; }).then(function(){ list(); }); });
           if (el.querySelector('[data-act=add]')) el.querySelector('[data-act=add]').addEventListener('click', function(){ form.append(code, m); });
           el.querySelector('[data-act=csv]').addEventListener('click', function(){
             // 누른 때의 답을 새로 읽어서 내려받음. 묶음이면 질문마다 한 덩어리씩 이어서 한 파일로

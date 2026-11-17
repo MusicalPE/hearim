@@ -71,6 +71,9 @@
           "flow": {
             ".validate": "newData.val() == 'self' || newData.val() == 'with'"
           },
+          "wait": {
+            ".validate": "newData.isBoolean()"
+          },
           "$other": {
             ".validate": false
           }

@@ -234,6 +234,27 @@ try:
     with t.expect_download() as dl: t.locator('.poll[data-code="%s"] [data-act=csv]'%A).click()
     csv=open(dl.value.path(),encoding='utf-8-sig').read()
     check('묶음 답 내려받기: 질문 셋이 한 파일에', '묶음' in dl.value.suggested_filename and csv.count('"질문 ')==3 and '줄넘기' in csv and '둘째 질문' in csv)
+    # 선생님과 함께: 뒤 질문은 닫혀 있다가 쪽을 넘기면 열림
+    t.reload(); t.wait_for_timeout(900)
+    t.locator('.poll[data-code="%s"] [data-act=add]'%C).click(); t.wait_for_timeout(200); t.fill('#mq','넷째 질문'); t.locator('#mo input').nth(0).fill('좋아요'); t.locator('#mo input').nth(1).fill('글쎄요'); t.select_option('#mfl','with'); t.click('#mc'); t.wait_for_timeout(1200)
+    D=sibs(A)[3] if len(sibs(A))==4 else ''
+    md=lambda c: dbget('polls/%s/meta'%c)
+    check('함께 넘어가기로 이으면: 새 질문은 대기(닫힘) · 이미 답이 있는 앞 질문은 열린 채', md(D).get('open') is False and md(D).get('wait') is True and all(md(c).get('open') is True and md(c).get('wait') is None for c in (A,B,C)) and '대기' in t.inner_text('.poll[data-code="%s"]'%D) and [md(c)['flow'] for c in (A,B,C,D)]==['with']*4)
+    WW=b.new_context(viewport={'width':390,'height':800}); setup(WW); wq=WW.new_page(); wq.on('pageerror',lambda e: errs.append(str(e))); wq.goto(APP+'?p='+D); wq.wait_for_timeout(600)
+    e20='아직 열리지 않은' in wq.inner_text('#jc') and wq.locator('.opt').count()==0 and '질문 4 / 4' in wq.inner_text('#jc')
+    r401=0
+    try: dbput('polls/%s/votes/%s'%(D,'w%015d'%1),{'c':0,'at':{'.sv':'timestamp'}})
+    except Exception as e: r401=getattr(e,'code',0)
+    an=b.new_context(viewport={'width':1200,'height':800}); setup(an); ap=an.new_page(); ap.goto(APP+'?b='+C); ap.wait_for_timeout(900); ap.click('#bnx'); ap.wait_for_timeout(900)
+    e21=('b='+D) in ap.url and '아직 열기 전' in ap.inner_text('#bm') and md(D).get('open') is False; an.close()
+    check('대기 중인 질문: 참여자는 안내만 보고 답을 못 냄 · 다른 사람이 쪽을 넘겨도 안 열림', e20 and r401==401 and e21, '%s %s %s'%(e20,r401,e21))
+    ob=T.new_page(); ob.on('pageerror',lambda e: errs.append(str(e))); ob.goto(APP+'?b='+D); ob.wait_for_timeout(1000)
+    e22=md(D).get('open') is False and '이 질문 열기' in ob.inner_text('#bop')
+    ob.click('#bpv'); ob.wait_for_timeout(900); ob.click('#bnx'); ob.wait_for_timeout(1200)
+    e23=md(D).get('open') is True and md(D).get('wait') is None and '아직 열기 전' not in ob.inner_text('#bm') and md(C).get('open') is True
+    wq.click('#jrl'); wq.wait_for_timeout(800); e24=wq.locator('.opt').count()==2; wq.locator('.opt').nth(0).click(); wq.click('#js'); wq.wait_for_timeout(600)
+    check('만든 사람이 쪽을 넘기면 그 질문이 열림 (바로 열어 볼 때는 안 열림) · 앞 질문은 계속 열림 · 참여자가 이어서 답함', e22 and e23 and e24 and len(dbget('polls/%s/votes'%D))==1 and '1' in ob.inner_text('.b-count'), '%s %s %s'%(e22,e23,e24)); ob.close(); WW.close()
+    t.reload(); t.wait_for_timeout(900); d=t.locator('.poll[data-code="%s"] [data-act=del]'%D); d.click(); d.click(); t.wait_for_timeout(1000)
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%B); d.click(); d.click(); t.wait_for_timeout(1000); e11=sibs(A)==[A,C]==sibs(C) and dbget('polls/%s'%B) is None
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%C); d.click(); d.click(); t.wait_for_timeout(1000)
     check('묶음에서 질문을 지우면 남은 순서가 고쳐지고 · 하나만 남으면 묶음이 풀림', e11 and sibs(A)==[] and dbget('polls/%s/meta/flow'%A) is None and '묶음' not in t.inner_text('.poll[data-code="%s"]'%A) and t.locator('.poll[data-code="%s"] [data-act=add]'%A).count()==1)
