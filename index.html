@@ -137,6 +137,22 @@
   body.board .bar .track { height: clamp(18px, 2.6vh, 38px); background: #22363F; }
   body.board .bar .fill { background: #5FD0D2; }
   body.board .bar.lead .fill { background: #FFC857; }
+  /* 그래프 모양: 세로 막대 · 원 그래프 (결과 화면) */
+  .cols { display: flex; align-items: flex-end; gap: clamp(10px, 2vw, 36px); height: 46vh; min-height: 260px; padding: 0 4px; border-bottom: 2px solid #33474F; margin-bottom: 1.2vh; }
+  .cols .col { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .cols .val { font-size: clamp(14px, 1.5vw, 28px); font-weight: 800; color: #F4F2EE; margin-bottom: .5vh; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cols .val small { font-weight: 600; color: #C9D1DB; font-size: .8em; }
+  .cols .stick { width: min(100%, 120px); min-height: 3px; background: #5FD0D2; border-radius: 6px 6px 0 0; transition: height .5s ease; }
+  .cols .col.lead .stick { background: #FFC857; }
+  .col-labs { display: flex; gap: clamp(10px, 2vw, 36px); padding: 0 4px; margin-bottom: 2vh; }
+  .col-labs span { flex: 1 1 0; min-width: 0; text-align: center; font-weight: 700; font-size: clamp(14px, 1.5vw, 26px); line-height: 1.25; overflow-wrap: anywhere; }
+  .pie-wrap { display: flex; align-items: center; gap: clamp(20px, 4vw, 70px); margin-bottom: 2vh; flex-wrap: wrap; }
+  .pie-wrap svg { width: min(46vh, 34vw, 520px); height: auto; flex: none; min-width: 220px; }
+  .pie-leg { flex: 1 1 260px; min-width: 0; display: grid; gap: 1.6vh; }
+  .pie-leg div { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; font-size: clamp(16px, 1.7vw, 30px); font-weight: 700; }
+  .pie-leg i { width: .9em; height: .9em; border-radius: .2em; display: block; }
+  .pie-leg span:last-child { color: #C9D1DB; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { .cols .stick { transition: none; } }
   .b-cmts { margin-top: 2.4vh; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 12px; }
   body.board .cmt { background: #1B303A; border-left-color: #5FD0D2; font-size: clamp(15px, 1.35vw, 24px); margin: 0; }
   body.board .cmt small { color: #9FB0BA; }
@@ -163,7 +179,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.5.1';
+const VERSION = '1.6.0';
 const MAX_POLLS = 30;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -315,6 +331,33 @@ function barsHtml(t){
   }).join('');
 }
 
+// 세로 막대: 가장 많은 보기를 가장 높게 (높이는 가장 많은 수에 맞춤)
+function colsHtml(t){
+  return '<div class="cols">' + t.opts.map(function(o, i){
+    const c = t.counts[i], pct = t.total ? Math.round(c / t.total * 100) : 0, h = t.max ? Math.round(c / t.max * 100) : 0;
+    return '<div class="col' + (c > 0 && c === t.max ? ' lead' : '') + '" title="' + esc(o) + ' · ' + n(c) + '명 · ' + pct + '%"><div class="val">' + n(c) + '명 <small>' + pct + '%</small></div><div class="stick" style="height:' + (h * .82) + '%"></div></div>';
+  }).join('') + '</div><div class="col-labs">' + t.opts.map(function(o){ return '<span>' + esc(o) + '</span>'; }).join('') + '</div>';
+}
+// 원 그래프: 보기 순서대로 12시부터 시계 방향. 색은 보기마다 정해 둔 여섯 가지(색각 차이를 살펴 고른 순서), 옆에 이름과 수를 같이 적음
+const PIE = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#0ca30c'];
+function pieHtml(t){
+  const R = 100, pt = function(a){ return (R + R * Math.sin(a)).toFixed(2) + ' ' + (R - R * Math.cos(a)).toFixed(2); };
+  let a0 = 0, sl = '';
+  t.opts.forEach(function(o, i){
+    const c = t.counts[i]; if (!c || !t.total) return;
+    const fr = c / t.total, a1 = a0 + fr * 2 * Math.PI, pct = Math.round(fr * 100), tip = '<title>' + esc(o) + ' · ' + n(c) + '명 · ' + pct + '%</title>';
+    sl += fr >= .9999 ? '<circle cx="100" cy="100" r="100" fill="' + PIE[i % 6] + '">' + tip + '</circle>'
+      : '<path d="M100 100L' + pt(a0) + 'A100 100 0 ' + (fr > .5 ? 1 : 0) + ' 1 ' + pt(a1) + 'Z" fill="' + PIE[i % 6] + '" stroke="#12222B" stroke-width="2" stroke-linejoin="round">' + tip + '</path>';
+    if (fr >= .08) { const m = (a0 + a1) / 2; sl += '<text x="' + (100 + 62 * Math.sin(m)).toFixed(1) + '" y="' + (100 - 62 * Math.cos(m)).toFixed(1) + '" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="800" fill="#fff" pointer-events="none">' + pct + '%</text>'; }
+    a0 = a1;
+  });
+  if (!sl) sl = '<circle cx="100" cy="100" r="99" fill="none" stroke="#33474F" stroke-width="2"></circle>';
+  return '<div class="pie-wrap"><svg class="pie" viewBox="0 0 200 200" role="img" aria-label="원 그래프">' + sl + '</svg><div class="pie-leg">' + t.opts.map(function(o, i){
+    const c = t.counts[i], pct = t.total ? Math.round(c / t.total * 100) : 0;
+    return '<div><i style="background:' + PIE[i % 6] + '"></i><span>' + esc(o) + '</span><span>' + n(c) + '명 · ' + pct + '%</span></div>';
+  }).join('') + '</div></div>';
+}
+
 /* ---- QR ---- */
 function qrSvg(text){
   if (typeof qrcode !== 'function') return '';
@@ -440,6 +483,14 @@ function pageBoard(code){
   const setJoin = function(){ $('bj').innerHTML = qrSvg(joinUrl(code)) + '<p class="how" id="bhow">QR을 찍고 골라 주세요</p><p class="url">' + esc(joinUrl(code).replace(/^https?:\/\//, '')) + '</p><p class="hint" style="margin:.6vh 0 0">설문 번호</p><p class="code" style="margin:0">' + esc(code) + '</p><div class="b-nav" id="bnv"></div>'; };
   setJoin();
   let meta = null, votes = null, uid = '', showCm = ls.get('ha_cm_' + code) !== '0', db = null, mref = null, vref = null, autoOpen = false;
+  // 그래프 모양: 가로 막대 · 세로 막대 · 원 그래프. 고른 모양은 이 기기에 기억하고 주소에도 적음(&g=col, &g=pie)
+  const GR = ['bar', 'col', 'pie'], GN = { bar: '가로 막대', col: '세로 막대', pie: '원 그래프' };
+  let chart = GR.indexOf(Q.get('g')) >= 0 ? Q.get('g') : (GR.indexOf(ls.get('ha_g')) >= 0 ? ls.get('ha_g') : 'bar');
+  const nextChart = function(){
+    chart = GR[(GR.indexOf(chart) + 1) % GR.length]; ls.set('ha_g', chart);
+    try { const u = new URL(location.href); if (chart === 'bar') u.searchParams.delete('g'); else u.searchParams.set('g', chart); history.replaceState(null, '', u.toString()); } catch (e) {}
+    draw();
+  };
   // 묶음: 쪽 넘기기 (화면을 새로 열지 않고 그 자리에서 다음 질문으로 바꿈 — 전체 화면이 풀리지 않게)
   const attach = function(){
     const my = code; mref = db.ref('polls/' + code + '/meta'); vref = db.ref('polls/' + code + '/votes');
@@ -461,7 +512,7 @@ function pageBoard(code){
     el.innerHTML = '<button type="button" class="btn sm" id="bpv"' + (i ? '' : ' disabled') + '>이전</button><span>' + (i + 1) + ' / ' + sb.length + '</span><button type="button" class="btn sm" id="bnx"' + (i < sb.length - 1 ? '' : ' disabled') + '>다음</button>';
     $('bpv').addEventListener('click', function(){ turn(-1); }); $('bnx').addEventListener('click', function(){ turn(1); });
   };
-  document.addEventListener('keydown', function(e){ if (!meta || e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'ArrowRight' || e.key === 'PageDown') turn(1); else if (e.key === 'ArrowLeft' || e.key === 'PageUp') turn(-1); });
+  document.addEventListener('keydown', function(e){ if (!meta || e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'ArrowRight' || e.key === 'PageDown') turn(1); else if (e.key === 'ArrowLeft' || e.key === 'PageUp') turn(-1); else if ((e.key === 'g' || e.key === 'G' || e.key === 'ㅎ') && !isText(meta)) nextChart(); });
   // 발표 모드: 켜고 끌 때 주소도 같이 바꿔서, 그 주소를 그대로 발표 자료에 넣을 수 있게
   const setShow = function(v){
     document.body.classList.toggle('show', v); window.dispatchEvent(new Event('resize'));
@@ -478,12 +529,13 @@ function pageBoard(code){
     if (autoOpen && uid && meta.owner === uid) { autoOpen = false; if (meta.wait && meta.open === false) openToggle(); }
     if (isText(meta)) return drawText();
     const t = tally(meta, votes), owner = uid && meta.owner === uid;
-    m.innerHTML = '<p class="b-q">' + esc(meta.q) + (meta.open === false ? '<span class="b-closed">' + (meta.wait ? '아직 열기 전' : '마감') + '</span>' : '') + '</p><p class="b-count"><b>' + n(t.total) + '</b> 명이 답했어요</p>' + barsHtml(t) +
+    m.innerHTML = '<p class="b-q">' + esc(meta.q) + (meta.open === false ? '<span class="b-closed">' + (meta.wait ? '아직 열기 전' : '마감') + '</span>' : '') + '</p><p class="b-count"><b>' + n(t.total) + '</b> 명이 답했어요</p>' + (chart === 'col' ? colsHtml(t) : chart === 'pie' ? pieHtml(t) : barsHtml(t)) +
       (meta.ask && showCm && t.cmts.length ? '<div class="b-cmts">' + t.cmts.slice(0, 12).map(function(c){ return '<div class="cmt">' + esc(c.t) + '<small>' + esc(t.opts[c.c] || '') + '</small></div>'; }).join('') + '</div>' : '');
-    $('bc').innerHTML = (meta.ask ? '<button type="button" class="btn sm' + (showCm ? ' on' : '') + '" id="bcm">한 줄 의견 ' + (showCm ? '보임' : '숨김') + '</button>' : '') +
+    $('bc').innerHTML = '<button type="button" class="btn sm" id="bgr">그래프: ' + GN[chart] + '</button>' + (meta.ask ? '<button type="button" class="btn sm' + (showCm ? ' on' : '') + '" id="bcm">한 줄 의견 ' + (showCm ? '보임' : '숨김') + '</button>' : '') +
       (owner ? '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? (meta.wait ? '이 질문 열기' : '다시 받기') : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' : '') +
       '<button type="button" class="btn sm" id="bsh">발표 모드</button><button type="button" class="btn sm" id="bfs">전체 화면</button>';
     $('bsh').addEventListener('click', function(){ setShow(true); });
+    $('bgr').addEventListener('click', nextChart);
     if ($('bcm')) $('bcm').addEventListener('click', function(){ showCm = !showCm; ls.set('ha_cm_' + code, showCm ? '1' : '0'); draw(); });
     $('bfs').addEventListener('click', function(){ const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function(){}); });
     if ($('bop')) $('bop').addEventListener('click', openToggle);

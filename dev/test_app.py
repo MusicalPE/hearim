@@ -71,6 +71,21 @@ try:
     check('결과 화면 실시간: 6명 · 주 500회 적금 3명 50%', '6' in bd.inner_text('.b-count') and '3명 · 50%' in tx and bd.locator('.bar.lead').count()==1 and '주 500회 적금' in bd.inner_text('.bar.lead'), bd.inner_text('.bar.lead').replace('\n',' '))
     check('한 줄 의견 3개 · 꺾쇠는 글자로만', bd.locator('.b-cmts .cmt').count()==3 and bd.locator('.b-cmts b').count()==0 and '<b>굵게</b>' in bd.inner_text('.b-cmts'))
     if SHOTS: bd.set_viewport_size({'width':1600,'height':900}); bd.wait_for_timeout(300); bd.screenshot(path=SHOTS+'/ha_board.png')
+    # 그래프 모양
+    e0='가로 막대' in bd.inner_text('#bgr') and bd.locator('.bar').count()==4
+    bd.click('#bgr'); bd.wait_for_timeout(250)
+    hs=bd.evaluate("()=>[...document.querySelectorAll('.cols .stick')].map(e=>e.getBoundingClientRect().height)")
+    e1='세로 막대' in bd.inner_text('#bgr') and bd.locator('.cols .col').count()==4 and bd.locator('.cols .col.lead').count()==1 and bd.locator('.col-labs span').count()==4 and hs.count(max(hs))==1 and '3명' in bd.inner_text('.cols .col.lead') and 'g=col' in bd.url
+    if SHOTS: bd.set_viewport_size({'width':1600,'height':900}); bd.wait_for_timeout(700); bd.screenshot(path=SHOTS+'/ha_col.png')
+    bd.click('#bgr'); bd.wait_for_timeout(250)
+    nz=sum(1 for x in bd.evaluate("()=>[...document.querySelectorAll('.pie-leg div span:last-child')].map(e=>e.textContent)") if not x.startswith('0명'))
+    e2='원 그래프' in bd.inner_text('#bgr') and bd.locator('svg.pie path').count()==nz and bd.locator('.pie-leg div').count()==4 and '3명 · 50%' in bd.inner_text('.pie-leg') and 'g=pie' in bd.url and bd.locator('#bj svg').is_visible()
+    if SHOTS: bd.wait_for_timeout(300); bd.screenshot(path=SHOTS+'/ha_pie.png'); bd.set_viewport_size({'width':1100,'height':900})
+    check('그래프 모양: 가로 막대 → 세로 막대 → 원 그래프 (주소에 g= 로 적힘)', e0 and e1 and e2, '%s %s %s %s'%(e0,e1,e2,hs))
+    gp=bd.context.new_page(); gp.goto(APP+'?b='+code+'&g=col&show=1'); gp.wait_for_timeout(900); e3=gp.locator('.cols .col').count()==4 and not gp.locator('.b-top').is_visible()
+    gp.keyboard.press('g'); gp.wait_for_timeout(250); e4=gp.locator('svg.pie').count()==1; gp.close()
+    bd.click('#bgr'); bd.wait_for_timeout(250)
+    check('그래프 모양: 주소로 바로 열기 · 발표 모드에서는 g 글쇠로 바꿈 · 다시 가로 막대', e3 and e4 and bd.locator('.bar').count()==4 and 'g=' not in bd.url and bd.locator('.cols').count()==0)
     # 발표 모드
     bd.click('#bsh'); bd.wait_for_timeout(250)
     check('발표 모드: 로고·단추 숨고 질문·QR·막대는 그대로 · 주소에 show=1', not bd.locator('.b-top').is_visible() and bd.locator('#bj svg').is_visible() and bd.locator('.bar').count()==4 and bd.locator('.b-q').is_visible() and 'show=1' in bd.url and '?b='+code in bd.url)
