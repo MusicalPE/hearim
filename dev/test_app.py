@@ -67,6 +67,15 @@ try:
     check('결과 화면 실시간: 6명 · 주 500회 적금 3명 50%', '6' in bd.inner_text('.b-count') and '3명 · 50%' in tx and bd.locator('.bar.lead').count()==1 and '주 500회 적금' in bd.inner_text('.bar.lead'), bd.inner_text('.bar.lead').replace('\n',' '))
     check('한 줄 의견 3개 · 꺾쇠는 글자로만', bd.locator('.b-cmts .cmt').count()==3 and bd.locator('.b-cmts b').count()==0 and '<b>굵게</b>' in bd.inner_text('.b-cmts'))
     if SHOTS: bd.set_viewport_size({'width':1600,'height':900}); bd.wait_for_timeout(300); bd.screenshot(path=SHOTS+'/ha_board.png')
+    # 발표 모드
+    bd.click('#bsh'); bd.wait_for_timeout(250)
+    check('발표 모드: 로고·단추 숨고 질문·QR·막대는 그대로 · 주소에 show=1', not bd.locator('.b-top').is_visible() and bd.locator('#bj svg').is_visible() and bd.locator('.bar').count()==4 and bd.locator('.b-q').is_visible() and 'show=1' in bd.url and '?b='+code in bd.url)
+    if SHOTS: bd.set_viewport_size({'width':1600,'height':900}); bd.wait_for_timeout(300); bd.screenshot(path=SHOTS+'/ha_show.png')
+    bd.keyboard.press('Escape'); bd.wait_for_timeout(200); e1=bd.locator('.b-top').is_visible() and 'show=1' not in bd.url
+    bd.click('#bsh'); bd.wait_for_timeout(200); bd.click('#bx'); bd.wait_for_timeout(200)
+    check('발표 모드 끝내기 (Esc · 단추)', e1 and bd.locator('.b-top').is_visible() and 'show=1' not in bd.url)
+    sh=bd.context.new_page(); sh.goto(APP+'?b='+code+'&show=1'); sh.wait_for_timeout(900)
+    check('발표 모드 주소로 바로 열기: 답이 실시간으로 보임', not sh.locator('.b-top').is_visible() and '6' in sh.inner_text('.b-count') and sh.locator('#bj svg').is_visible()); sh.close()
     bd.click('#bcm'); bd.wait_for_timeout(200); check('한 줄 의견 숨김', bd.locator('.b-cmts').count()==0); bd.click('#bcm')
     # 남이 연 결과 화면에는 주인 단추가 없음
     O=b.new_context(viewport={'width':1100,'height':800}); setup(O); ob=O.new_page(); ob.goto(APP+'?b='+code); ob.wait_for_timeout(900)
@@ -89,6 +98,17 @@ try:
     # 다시 받기 · 답 지우기 · 내려받기 · 지우기
     t.reload(); t.wait_for_timeout(700)
     check('목록: 마감 · 답 6명', '마감' in t.inner_text('.poll') and '답 6명' in t.inner_text('.poll'))
+    # 고치기 (답이 6명 있는 설문)
+    t.locator('.poll [data-act=edit]').first.click(); t.wait_for_timeout(200)
+    check('고치기: 칸에 내용이 채워지고 · 답이 있어 보기 빼기는 잠김', t.input_value('#mq')=='어떻게 보여 주면 모두가 꾸준히 뛸까요?' and t.locator('#mo input').count()==4 and t.locator('#mo button:disabled').count()==4 and '6명' in t.inner_text('#me') and t.input_value('#ml')=='https://musicalpe.github.io/apps/' and '고친 내용 저장' in t.inner_text('#mc'))
+    t.locator('#mo input').nth(1).fill(''); t.click('#mc'); e0='비울 수 없어요' in t.inner_text('#mm')
+    t.click('#mx'); t.wait_for_timeout(100)
+    check('고치기: 답 있는 보기는 못 비움 · 그만두기 하면 그대로', e0 and t.input_value('#mq')=='' and '설문 만들기' in t.inner_text('#mc') and dbget('polls/%s/meta/q'%code)=='어떻게 보여 주면 모두가 꾸준히 뛸까요?')
+    t.locator('.poll [data-act=edit]').first.click(); t.wait_for_timeout(200)
+    t.fill('#mq','어떻게 보여 주면 모두가 꾸준히 뛸까요? (고침)'); t.locator('#mo input').nth(1).fill('하루 100회 넘게 뛴 날 수 순위'); t.click('#ma'); t.locator('#mo input').nth(4).fill('잘 모르겠어요'); t.uncheck('#mask')
+    t.click('#mc'); t.wait_for_timeout(700); m2=dbget('polls/%s/meta'%code)
+    check('고치기 저장: 질문·보기 글·보기 더하기 반영 · 답 6명·마감 상태·주인·번호 그대로', m2['q'].endswith('(고침)') and (m2['opts']['1'] if isinstance(m2['opts'],dict) else m2['opts'][1])=='하루 100회 넘게 뛴 날 수 순위' and len(m2['opts'])==5 and m2['ask'] is False and m2['open'] is False and m2['owner']=='teacher1' and m2['link']=='https://musicalpe.github.io/apps/' and len(dbget('polls/%s/votes'%code))==6 and '(고침)' in t.inner_text('.poll') and '고쳤어요' in t.inner_text('#mm'))
+    bd.wait_for_timeout(500); check('고친 내용이 열려 있는 결과 화면에 바로 반영', '(고침)' in bd.inner_text('.b-q') and bd.locator('.bar').count()==5 and '3명 · 50%' in bd.inner_text('.bar.lead'))
     with t.expect_download() as dl: t.locator('.poll [data-act=csv]').first.click()
     csv=open(dl.value.path(),encoding='utf-8-sig').read()
     check('답 내려받기 (6줄 · 연락처 같은 건 없음)', csv.count('\n')==7 and '주 500회 적금' in csv and '하루 빠져도' in csv, dl.value.suggested_filename)
