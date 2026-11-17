@@ -57,8 +57,19 @@
           },
           "hide": {
             "$i": {
-              ".validate": "$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+              ".validate": "$i.matches(/^[0-9]{1,3}$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
             }
+          },
+          "mod": {
+            ".validate": "newData.isBoolean()"
+          },
+          "sib": {
+            "$i": {
+              ".validate": "$i.matches(/^[0-9]$/) && newData.isString() && newData.val().matches(/^[a-z0-9]{6}$/)"
+            }
+          },
+          "flow": {
+            ".validate": "newData.val() == 'self' || newData.val() == 'with'"
           },
           "$other": {
             ".validate": false

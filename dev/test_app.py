@@ -193,6 +193,67 @@ try:
     jp=an.new_page(); jp.goto(APP+'?p='+fc); jp.wait_for_timeout(500); jp.locator('.ja').first.fill('씨발'); jp.click('#js'); jp.wait_for_timeout(600)
     check('다른 사람 화면: 걸러진 답·단추 안 보임 · 참여자가 낸 거친 말도 자기 결과에 안 나옴', ks(ap)==['다시발야구','새끼손가락','줄넘기'] and ap.locator('#bfb').count()==0 and jp.locator('#jr .cloud .w').count()==3 and '고마워요' in jp.inner_text('#jc')); an.close()
     fb.close(); d=t.locator('.poll[data-code="%s"] [data-act=del]'%fc); d.click(); d.click(); t.wait_for_timeout(900)
+    # ===== 질문 잇기 (묶음) =====
+    sibs=lambda c: (lambda v: (list(v.values()) if isinstance(v,dict) else v) or [])(dbget('polls/%s/meta/sib'%c))
+    t.reload(); t.wait_for_timeout(800)
+    t.fill('#mq','첫째 질문'); t.locator('#mo input').nth(0).fill('가'); t.locator('#mo input').nth(1).fill('나'); t.fill('#ml','https://musicalpe.github.io/apps/'); t.click('#mc'); t.wait_for_timeout(800)
+    A=t.locator('.poll').first.get_attribute('data-code')
+    t.locator('.poll[data-code="%s"] [data-act=add]'%A).click(); t.wait_for_timeout(200)
+    e0='질문 잇기' in t.inner_text('#mh') and t.locator('#mfw').is_visible() and A in t.inner_text('#me') and '이 질문 잇기' in t.inner_text('#mc')
+    t.check('#mt1'); t.fill('#mq','둘째 질문'); t.click('#mc'); t.wait_for_timeout(900)
+    B=[c for c in sibs(A) if c!=A][0] if len(sibs(A))==2 else ''
+    check('질문 잇기: 둘째 질문이 묶음으로 이어짐 (두 설문 모두 순서 목록·넘어가는 방식)', e0 and sibs(A)==[A,B] and sibs(B)==[A,B] and dbget('polls/%s/meta/flow'%A)=='self' and dbget('polls/%s/meta/flow'%B)=='self' and dbget('polls/%s/meta/type'%B)=='text' and '2개가 한 묶음' in t.inner_text('#mm') and '설문 만들기' in t.inner_text('#mh'))
+    e1=t.locator('.poll[data-code="%s"] [data-act=add]'%A).count()==0
+    t.locator('.poll[data-code="%s"] [data-act=add]'%B).click(); t.wait_for_timeout(200); t.fill('#mq','셋째 질문'); t.locator('#mo input').nth(0).fill('예'); t.locator('#mo input').nth(1).fill('아니오'); t.select_option('#mfl','with'); t.click('#mc'); t.wait_for_timeout(900)
+    C=sibs(A)[2] if len(sibs(A))==3 else ''
+    order=[e.get_attribute('data-code') for e in t.locator('.poll').all()][:3]
+    check('질문 잇기: 셋째까지 · 넘어가는 방식을 바꾸면 묶음 전체에 적용 · 목록에 순서대로', e1 and sibs(A)==[A,B,C]==sibs(B)==sibs(C) and [dbget('polls/%s/meta/flow'%c) for c in (A,B,C)]==['with']*3 and order==[A,B,C] and '묶음 1/3' in t.inner_text('.poll[data-code="%s"]'%A) and '묶음 3/3' in t.inner_text('.poll[data-code="%s"]'%C), str(order))
+    # 선생님과 함께 넘어가기
+    W=b.new_context(viewport={'width':390,'height':800}); setup(W); wp=W.new_page(); wp.on('pageerror',lambda e: errs.append(str(e))); wp.goto(APP+'?p='+A); wp.wait_for_timeout(500)
+    e2='질문 1 / 3' in wp.inner_text('#jc'); wp.locator('.opt').nth(0).click(); wp.click('#js'); wp.wait_for_timeout(500)
+    check('함께 넘어가기: 답을 내면 다음 QR을 기다리라는 안내 (다음 단추·끝 주소 없음)', e2 and wp.locator('#jnx').count()==0 and 'QR을 찍어' in wp.inner_text('#jc') and '앱 모음' not in wp.inner_text('#jc')); W.close()
+    # 고치기로 스스로 넘어가기로 바꿈
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%B).click(); t.wait_for_timeout(200); e3=t.locator('#mfw').is_visible() and t.input_value('#mfl')=='with'
+    t.select_option('#mfl','self'); t.click('#mc'); t.wait_for_timeout(900)
+    check('고치기: 넘어가는 방식을 바꾸면 묶음 전체에 적용 · 순서 목록 그대로', e3 and [dbget('polls/%s/meta/flow'%c) for c in (A,B,C)]==['self']*3 and sibs(B)==[A,B,C] and dbget('polls/%s/meta/type'%B)=='text')
+    S=b.new_context(viewport={'width':390,'height':800}); setup(S); sp=S.new_page(); sp.on('pageerror',lambda e: errs.append(str(e))); sp.goto(APP+'?p='+A); sp.wait_for_timeout(500)
+    sp.locator('.opt').nth(1).click(); sp.click('#js'); sp.wait_for_timeout(500); e4='다음 질문 (2 / 3)' in sp.inner_text('#jnx') and '앱 모음' not in sp.inner_text('#jc')
+    sp.click('#jnx'); sp.wait_for_timeout(700); e5=('p='+B) in sp.url and '질문 2 / 3' in sp.inner_text('#jc') and sp.locator('.ja').count()==1
+    sp.locator('.ja').first.fill('줄넘기'); sp.click('#js'); sp.wait_for_timeout(500); sp.click('#jnx'); sp.wait_for_timeout(700)
+    e6=('p='+C) in sp.url and '질문 3 / 3' in sp.inner_text('#jc'); sp.locator('.opt').nth(0).click(); sp.click('#js'); sp.wait_for_timeout(500)
+    check('스스로 넘어가기: 다음 질문 단추로 끝까지 · 마지막에만 끝 주소', e4 and e5 and e6 and sp.locator('#jnx').count()==0 and len(dbget('polls/%s/votes'%B))==1 and len(dbget('polls/%s/votes'%C))==1)
+    # 결과 화면 쪽 넘기기
+    sb=T.new_page(); sb.on('pageerror',lambda e: errs.append(str(e))); sb.goto(APP+'?b='+A); sb.wait_for_timeout(1000)
+    e7='1 / 3' in sb.inner_text('#bnv') and sb.is_disabled('#bpv') and '첫째 질문' in sb.inner_text('#bm') and ('p='+A) in sb.inner_text('#bj')
+    sb.click('#bnx'); sb.wait_for_timeout(900)
+    e8=('b='+B) in sb.url and '둘째 질문' in sb.inner_text('#bm') and sb.locator('#bw .w').count()==1 and ('p='+B) in sb.inner_text('#bj') and '2 / 3' in sb.inner_text('#bnv') and '적어 주세요' in sb.inner_text('#bhow')
+    sb.keyboard.press('ArrowRight'); sb.wait_for_timeout(900); e9=('b='+C) in sb.url and '셋째 질문' in sb.inner_text('#bm') and sb.locator('.bar').count()==2 and sb.is_disabled('#bnx') and '골라 주세요' in sb.inner_text('#bhow')
+    sb.keyboard.press('PageUp'); sb.wait_for_timeout(900); e10=('b='+B) in sb.url and sb.locator('#bw .w').count()==1
+    sb.click('#bsh'); sb.wait_for_timeout(300); sb.keyboard.press('PageUp'); sb.wait_for_timeout(900)
+    check('결과 화면 쪽 넘기기: 단추·화살표·쪽 넘김 글쇠 · 쪽마다 그 질문의 QR · 발표 모드에서도', e7 and e8 and e9 and e10 and ('b='+A) in sb.url and 'show=1' in sb.url and sb.locator('#bnv').is_visible() and '1명' in sb.inner_text('#bm'), '%s %s %s %s'%(e7,e8,e9,e10)); sb.close()
+    with t.expect_download() as dl: t.locator('.poll[data-code="%s"] [data-act=csv]'%A).click()
+    csv=open(dl.value.path(),encoding='utf-8-sig').read()
+    check('묶음 답 내려받기: 질문 셋이 한 파일에', '묶음' in dl.value.suggested_filename and csv.count('"질문 ')==3 and '줄넘기' in csv and '둘째 질문' in csv)
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%B); d.click(); d.click(); t.wait_for_timeout(1000); e11=sibs(A)==[A,C]==sibs(C) and dbget('polls/%s'%B) is None
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%C); d.click(); d.click(); t.wait_for_timeout(1000)
+    check('묶음에서 질문을 지우면 남은 순서가 고쳐지고 · 하나만 남으면 묶음이 풀림', e11 and sibs(A)==[] and dbget('polls/%s/meta/flow'%A) is None and '묶음' not in t.inner_text('.poll[data-code="%s"]'%A) and t.locator('.poll[data-code="%s"] [data-act=add]'%A).count()==1)
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%A); d.click(); d.click(); t.wait_for_timeout(900)
+    # ===== 확인한 뒤 띄우기 =====
+    t.check('#mt1'); t.fill('#mq','하고 싶은 말'); t.check('#mmod'); t.click('#mc'); t.wait_for_timeout(800)
+    M=t.locator('.poll').first.get_attribute('data-code')
+    for i,a in enumerate([['재밌어요'],['또 해요'],['힘들어요'],['재밌어요']]): dbput('polls/%s/votes/%s'%(M,'m%015d'%i),{'a':a,'at':{'.sv':'timestamp'}})
+    mb=T.new_page(); mb.on('pageerror',lambda e: errs.append(str(e))); mb.goto(APP+'?b='+M); mb.wait_for_timeout(1000)
+    check('확인한 뒤 띄우기: 처음엔 아무 답도 안 뜨고 · 만든 사람에게 확인할 답 목록', dbget('polls/%s/meta/mod'%M) is True and mb.locator('#bw .w').count()==0 and '확인할 답 3개' in mb.inner_text('#bfb') and '재밌어요 · 2명' in mb.inner_text('#bfl') and '4' in mb.inner_text('.b-count'))
+    mb.locator('#bfl button[data-k="재밌어요"][data-a=show]').click(); mb.wait_for_timeout(600); e12=ks(mb)==['재밌어요'] and '2개' in mb.inner_text('#bfb')
+    mb.locator('#bfl button[data-k="힘들어요"][data-a=drop]').click(); mb.wait_for_timeout(600); e13=ks(mb)==['재밌어요'] and '1개' in mb.inner_text('#bfb') and sorted(hl(M))==['+재밌어요','힘들어요']
+    an=b.new_context(viewport={'width':1200,'height':800}); setup(an); ap=an.new_page(); ap.goto(APP+'?b='+M); ap.wait_for_timeout(900); e14=ks(ap)==['재밌어요'] and ap.locator('#bfb').count()==0 and ap.locator('#bfl .row').count()==0; an.close()
+    dbput('polls/%s/votes/%s'%(M,'m%015d'%9),{'a':['최고'],'at':{'.sv':'timestamp'}}); mb.wait_for_timeout(900); e15=ks(mb)==['재밌어요'] and '2개' in mb.inner_text('#bfb')
+    mb.click('#ball'); mb.wait_for_timeout(600)
+    check('확인한 뒤 띄우기: 띄우기·버리기·모두 띄우기 · 다른 사람에게는 띄운 답만', e12 and e13 and e14 and e15 and ks(mb)==['또해요','재밌어요','최고'] and mb.locator('#bfb').count()==0, '%s %s %s %s %s'%(e12,e13,e14,e15,ks(mb)))
+    mb.click('#bsh'); mb.wait_for_timeout(300); e16=not mb.locator('#bfl').is_visible(); mb.close()
+    t.reload(); t.wait_for_timeout(800); t.locator('.poll[data-code="%s"] [data-act=edit]'%M).click(); t.wait_for_timeout(200); e17=t.is_checked('#mmod'); t.uncheck('#mmod'); t.click('#mc'); t.wait_for_timeout(800)
+    check('확인한 뒤 띄우기: 발표 모드에서는 목록이 안 보임 · 고치기로 끌 수 있음', e16 and e17 and dbget('polls/%s/meta/mod'%M) is None and len(hl(M))>=3)
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%M); d.click(); d.click(); t.wait_for_timeout(900)
     # ===== 사용 안내 · 설문 수 상한 =====
     t.locator('details.guide summary').click(); check('첫 화면 사용 안내', '30개까지' in t.inner_text('details.guide') and '구글 로그인' in t.inner_text('details.guide'))
     for i in range(30):
