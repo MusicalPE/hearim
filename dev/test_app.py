@@ -12,6 +12,10 @@ ok=True
 def check(l,c,x=''):
     global ok; ok=ok and bool(c); print(('✔' if c else '✘'),l,x)
 def dbget(p): return json.loads(urllib.request.urlopen(DBU+'/'+p+'.json').read())
+def dbput(p,v,auth=''):
+    r=urllib.request.Request(DBU+'/'+p+'.json'+('?auth='+auth if auth else ''),data=json.dumps(v).encode(),method='PUT',headers={'Content-Type':'application/json'}); return urllib.request.urlopen(r).read()
+def hl(code):
+    h=dbget('polls/%s/meta/hide'%code); return (list(h.values()) if isinstance(h,dict) else h) or []
 def setup(ctx):
     ctx.route(re.compile(r'.*/config\.js(\?.*)?$'), lambda r: r.fulfill(body=CFG,content_type='application/javascript'))
     ctx.route(re.compile(r'https://www\.gstatic\.com/firebasejs/.*/firebase-app-compat\.js'), lambda r: r.fulfill(body=STUB,content_type='application/javascript'))
@@ -169,6 +173,33 @@ try:
     pg.context.close()
     armed_del=t.locator('.poll[data-code="%s"] [data-act=del]'%tc); armed_del.click(); armed_del.click(); t.wait_for_timeout(900)
     check('적어서 내기 설문 지우기', dbget('polls/%s'%tc) is None)
+    # ===== 거친 말 거르기 =====
+    bad=['시발','씨발','ㅅㅂ','병신','시 발','시1발','FUCK you','개새끼','보지','지랄 마']; good=['다시 발표','해보지 뭐','줄넘기','시바견','발야구 하고 싶어요','검색기','잠자지 말자','새우깡','미쳤다 재밌다']
+    rb=t.evaluate('(a)=>a.map(isBad)',bad); rg=t.evaluate('(a)=>a.map(isBad)',good)
+    check('거친 말 가리기: 거친 말 %d개는 걸리고 · 보통 말 %d개는 통과'%(len(bad),len(good)), all(rb) and not any(rg), '%s %s'%(rb,rg))
+    t.check('#mt1'); t.fill('#mq','오늘 체육 어땠나요?'); t.select_option('#mmx','2'); t.click('#mc'); t.wait_for_timeout(700)
+    fc=t.locator('.poll').first.get_attribute('data-code')
+    for i,a in enumerate([['시발','줄넘기'],['ㅅㅂ'],['다시 발야구'],['시 발'],['새끼손가락']]): dbput('polls/%s/votes/%s'%(fc,'f%015d'%i),{'a':a,'at':{'.sv':'timestamp'}})
+    fb=T.new_page(); fb.on('pageerror',lambda e: errs.append(str(e))); fb.goto(APP+'?b='+fc); fb.wait_for_timeout(1000)
+    ks=lambda pg: sorted(w.get_attribute('data-k') for w in pg.locator('#bw .w').all())
+    check('거친 말은 구름에 안 나옴 · 만든 사람에게 걸러진 답 3개 단추', ks(fb)==['다시발야구','줄넘기'] and '3개' in fb.inner_text('#bfb') and '5' in fb.inner_text('.b-count'), str(ks(fb)))
+    fb.click('#bfb'); fb.wait_for_timeout(200); e0='새끼손가락' in fb.inner_text('#bfl') and '시발 · 2명' in fb.inner_text('#bfl')
+    fb.locator('#bfl button[data-k="새끼손가락"]').click(); fb.wait_for_timeout(600)
+    check('걸러진 답 보기 · 괜찮은 답은 보이기로 되살림', e0 and ks(fb)==['다시발야구','새끼손가락','줄넘기'] and hl(fc)==['+새끼손가락'] and '2개' in fb.inner_text('#bfb'))
+    fb.locator('#bw .w[data-k="줄넘기"]').click(); fb.wait_for_timeout(600); e1=ks(fb)==['다시발야구','새끼손가락'] and len(hl(fc))==2
+    fb.click('#bun'); fb.wait_for_timeout(600)
+    check('숨긴 답 되살리기를 해도 보이기 한 답은 그대로', e1 and ks(fb)==['다시발야구','새끼손가락','줄넘기'] and hl(fc)==['+새끼손가락'])
+    an=b.new_context(viewport={'width':1200,'height':800}); setup(an); ap=an.new_page(); ap.goto(APP+'?b='+fc); ap.wait_for_timeout(900)
+    jp=an.new_page(); jp.goto(APP+'?p='+fc); jp.wait_for_timeout(500); jp.locator('.ja').first.fill('씨발'); jp.click('#js'); jp.wait_for_timeout(600)
+    check('다른 사람 화면: 걸러진 답·단추 안 보임 · 참여자가 낸 거친 말도 자기 결과에 안 나옴', ks(ap)==['다시발야구','새끼손가락','줄넘기'] and ap.locator('#bfb').count()==0 and jp.locator('#jr .cloud .w').count()==3 and '고마워요' in jp.inner_text('#jc')); an.close()
+    fb.close(); d=t.locator('.poll[data-code="%s"] [data-act=del]'%fc); d.click(); d.click(); t.wait_for_timeout(900)
+    # ===== 사용 안내 · 설문 수 상한 =====
+    t.locator('details.guide summary').click(); check('첫 화면 사용 안내', '30개까지' in t.inner_text('details.guide') and '구글 로그인' in t.inner_text('details.guide'))
+    for i in range(30):
+        c='zz%04d'%i; dbput('polls/%s/meta'%c,{'owner':'teacher1','q':'상한 시험 %d'%i,'opts':['가','나'],'open':True,'ask':False,'res':True,'at':1000+i},'teacher1'); dbput('users/teacher1/polls/%s'%c,1000+i,'teacher1')
+    t.reload(); t.wait_for_timeout(1500); n0=len(dbget('users/teacher1/polls?auth=teacher1'.replace('?auth=teacher1','')) or {}) if False else t.locator('.poll').count()
+    t.fill('#mq','서른한 번째'); t.locator('#mo input').nth(0).fill('가'); t.locator('#mo input').nth(1).fill('나'); t.click('#mc'); t.wait_for_timeout(600)
+    check('설문 수 상한: 30개가 넘으면 더 못 만들고 안내', '30개까지' in t.inner_text('#mm') and t.locator('.poll').count()==n0 and n0>=30)
     t.click('#lo'); t.wait_for_timeout(300); check('로그아웃 → 로그인 단추', t.locator('#lg').count()==1)
     # 연결 정보가 없을 때
     N=b.new_context(); N.route(re.compile(r'.*/config\.js(\?.*)?$'), lambda r: r.fulfill(body='window.HEARIM_CONFIG=null;',content_type='application/javascript')); n1=N.new_page(); n1.goto(APP); n1.wait_for_timeout(300); check('연결 정보 없으면 안내만', '아직 연결 전' in n1.inner_text('#app'))
