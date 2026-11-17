@@ -24,10 +24,10 @@
   button { cursor: pointer; }
   .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-  .logo { font-weight: 900; font-size: 1.5em; letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
+  .logo { display: inline-flex; align-items: center; flex: none; white-space: nowrap; font-weight: 900; font-size: 1.5em; letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
   .logo b { color: var(--brand); }
-  .logo img { width: 1.3em; height: 1.3em; vertical-align: -.32em; margin-right: .32em; border-radius: .3em; }
-  .logo small { font-weight: 600; font-size: .5em; color: var(--ink-3); margin-left: 8px; letter-spacing: 0; }
+  .logo img { width: 1.3em; height: 1.3em; flex: none; margin-right: .32em; border-radius: .3em; }
+  .logo small { font-weight: 600; font-size: .5em; color: var(--ink-3); margin-left: 8px; letter-spacing: 0; align-self: flex-end; padding-bottom: .45em; }
   h1 { font-size: 1.7em; line-height: 1.25; margin: 0 0 6px; letter-spacing: -.02em; }
   h2 { font-size: 1.15em; margin: 0 0 10px; }
   .hint { color: var(--ink-3); font-size: .92em; }
@@ -115,10 +115,10 @@
   /* 결과 화면 (큰 화면) */
   body.board { background: #12222B; color: #F4F2EE; }
   body.board .wrap { max-width: none; padding: 3.2vh 3.2vw; min-height: 100vh; display: flex; flex-direction: column; }
-  .b-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 2vh; }
+  .b-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 16px; margin-bottom: 2vh; }
   .b-top .logo { color: #F4F2EE; font-size: clamp(18px, 2.2vw, 34px); }
   .b-top .logo b { color: #5FD0D2; }
-  .b-ctl { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .b-ctl { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex: 1 1 auto; }
   body.board .btn { background: transparent; border-color: #3B4E58; color: #C9D1DB; }
   body.board .btn:hover { border-color: #5FD0D2; color: #fff; }
   body.board .btn.on { background: #5FD0D2; border-color: #5FD0D2; color: #12222B; }
@@ -163,7 +163,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.5.0';
+const VERSION = '1.5.1';
 const MAX_POLLS = 30;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
