@@ -26,6 +26,7 @@
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
   .logo { font-weight: 900; font-size: 1.5em; letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
   .logo b { color: var(--brand); }
+  .logo img { width: 1.3em; height: 1.3em; vertical-align: -.32em; margin-right: .32em; border-radius: .3em; }
   .logo small { font-weight: 600; font-size: .5em; color: var(--ink-3); margin-left: 8px; letter-spacing: 0; }
   h1 { font-size: 1.7em; line-height: 1.25; margin: 0 0 6px; letter-spacing: -.02em; }
   h2 { font-size: 1.15em; margin: 0 0 10px; }
@@ -133,7 +134,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
 const Q = new URLSearchParams(location.search);
@@ -149,7 +150,7 @@ const joinUrl = function(code){ return BASE + '?p=' + code; };
 const boardUrl = function(code){ return BASE + '?b=' + code; };
 const ls = { get: function(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function(k, v){ try { localStorage.setItem(k, v); } catch (e) {} } };
 const optsOf = function(meta){ const o = meta && meta.opts; if (!o) return []; return (Array.isArray(o) ? o : Object.keys(o).sort().map(function(k){ return o[k]; })).filter(function(x){ return x != null; }); };
-const logo = '<a class="logo" href="' + esc(BASE) + '">헤아림<small>Hear<b>I&#39;m</b></small></a>';
+const logo = '<a class="logo" href="' + esc(BASE) + '"><img src="icon.svg" alt="" width="64" height="64">헤아림<small>Hear<b>I&#39;m</b></small></a>';
 
 /* ---- 주소로 바로 읽고 쓰기 (참여 화면) ---- */
 function rest(path, opt){
