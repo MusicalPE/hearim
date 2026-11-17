@@ -49,6 +49,15 @@
   .msg.bad { background: var(--warn-tint); color: var(--warn); }
   .empty { text-align: center; color: var(--ink-3); padding: 28px 8px; }
 
+  /* 첫 화면: 넓은 화면(PC)에서는 두 칸 — 왼쪽 참여·내 설문, 오른쪽 만들기 */
+  .card[hidden] { display: none; }
+  @media (min-width: 980px) {
+    body.home .wrap { max-width: 1180px; padding: 28px 28px 56px; }
+    .home-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); grid-template-rows: auto 1fr; grid-template-areas: "join make" "mine make"; column-gap: 18px; align-items: start; }
+    .h-join { grid-area: join; } .h-make { grid-area: make; } .h-mine { grid-area: mine; }
+    .home-grid .card { padding: 26px; }
+  }
+
   /* 참여 화면 */
   .q { font-size: 1.45em; font-weight: 800; line-height: 1.3; letter-spacing: -.01em; margin: 4px 0 16px; }
   .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 15px 16px; margin-bottom: 10px; border: 2px solid var(--line); border-radius: 14px; background: #fff; font-weight: 700; font-size: 1.05em; }
@@ -116,7 +125,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
 const Q = new URLSearchParams(location.search);
@@ -283,10 +292,12 @@ function armed(btn, text, run){
 
 /* ================= 첫 화면 · 만들기 ================= */
 function pageHome(){
-  app.innerHTML = '<div class="top">' + logo + '</div>' +
-    '<div class="card"><h1>여러분의 생각, 듣고 있어요</h1><p class="hint" style="margin:0 0 14px">QR을 찍고 고르면 결과가 바로 화면에 올라와요. 참여하는 사람은 가입도 설치도 필요 없어요.</p>' +
+  document.body.classList.add('home');
+  app.innerHTML = '<div class="top">' + logo + '</div><div class="home-grid">' +
+    '<div class="card h-join"><h1>여러분의 생각, 듣고 있어요</h1><p class="hint" style="margin:0 0 14px">QR을 찍고 고르면 결과가 바로 화면에 올라와요. 참여하는 사람은 가입도 설치도 필요 없어요.</p>' +
     '<label class="f" for="hc" style="margin-top:0">설문 번호로 참여하기</label><div class="row"><input type="text" id="hc" class="code" inputmode="latin" autocapitalize="none" autocomplete="off" maxlength="6" placeholder="예: k7m2pq" style="flex:1; min-width:0; text-transform:lowercase"><button type="button" class="btn main" id="hg">들어가기</button></div><div id="hm"></div></div>' +
-    '<div class="card" id="mk"><h2>설문 만들기</h2><p class="hint">연결하는 중…</p></div>' +
+    '<div class="card h-make" id="mk"><h2>설문 만들기</h2><p class="hint">연결하는 중…</p></div>' +
+    '<div class="card h-mine" id="myc" hidden></div></div>' +
     '<p class="hint" style="text-align:center">헤아림 HearI&#39;m ' + VERSION + ' · 만든 사람 음악적체육인</p>';
   const go = function(){ const c = $('hc').value.trim().toLowerCase(); if (!CODE_RE.test(c)) { $('hm').innerHTML = '<p class="msg bad">번호는 영어 소문자와 숫자 6자리예요.</p>'; return; } location.href = joinUrl(c); };
   $('hg').addEventListener('click', go); $('hc').addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
@@ -297,6 +308,7 @@ function pageHome(){
   }).catch(function(e){ mk.innerHTML = '<h2>설문 만들기</h2><p class="msg bad">' + esc(e.message) + '</p>'; });
 
   function login(){
+    $('myc').hidden = true; $('myc').innerHTML = '';
     mk.innerHTML = '<h2>설문 만들기</h2><p class="hint" style="margin:0 0 12px">만든 설문을 다시 찾을 수 있게 구글 계정으로 로그인해요. 참여하는 사람은 로그인하지 않아요.</p><button type="button" class="btn main" id="lg">구글로 로그인</button><div id="lm"></div>';
     $('lg').addEventListener('click', function(){
       fb.auth().signInWithPopup(new fb.auth.GoogleAuthProvider()).catch(function(e){ $('lm').innerHTML = '<p class="msg bad">로그인하지 못했어요. (' + esc(e && e.message || e) + ')</p>'; });
@@ -309,8 +321,8 @@ function pageHome(){
       '<label class="chk"><input type="checkbox" id="mask" checked><span>한 줄 의견도 받기</span></label>' +
       '<label class="chk"><input type="checkbox" id="mres" checked><span>답을 낸 사람에게 결과 보여 주기</span></label>' +
       '<label class="f" for="ml">끝나고 보여 줄 주소 <span class="hint" style="font-weight:400">(안 써도 돼요)</span></label><input type="text" id="ml" inputmode="url" autocapitalize="none" placeholder="https://"><input type="text" id="mll" maxlength="30" placeholder="단추에 쓸 말 (예: 자료 보러 가기)" style="margin-top:8px">' +
-      '<div id="mm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="mc">설문 만들기</button></div>' +
-      '<h2 style="margin:26px 0 10px">내가 만든 설문</h2><div id="my"><p class="hint">불러오는 중…</p></div>';
+      '<div id="mm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="mc">설문 만들기</button></div>';
+    $('myc').innerHTML = '<h2>내가 만든 설문</h2><div id="my"><p class="hint">불러오는 중…</p></div>'; $('myc').hidden = false;
     const mo = $('mo');
     const addOpt = function(v){ if (mo.children.length >= 6) return; const d = document.createElement('div'); d.className = 'row'; d.style.marginBottom = '8px'; d.innerHTML = '<input type="text" maxlength="60" placeholder="보기 ' + (mo.children.length + 1) + '" style="flex:1; min-width:0"><button type="button" class="btn sm" aria-label="이 보기 빼기">빼기</button>'; d.querySelector('input').value = v || ''; d.querySelector('button').addEventListener('click', function(){ if (mo.children.length > 2) { d.remove(); renum(); } }); mo.appendChild(d); renum(); };
     const renum = function(){ Array.prototype.forEach.call(mo.children, function(d, i){ d.querySelector('input').placeholder = '보기 ' + (i + 1); }); $('ma').disabled = mo.children.length >= 6; };
