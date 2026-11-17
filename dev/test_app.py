@@ -99,7 +99,7 @@ try:
     check('설문 지우기', dbget('polls/%s'%code) is None and '아직 만든 설문이 없어요' in t.inner_text('#my'))
     t.click('#lo'); t.wait_for_timeout(300); check('로그아웃 → 로그인 단추', t.locator('#lg').count()==1)
     # 연결 정보가 없을 때
-    N=b.new_context(); n1=N.new_page(); n1.goto(APP); n1.wait_for_timeout(300); check('연결 정보 없으면 안내만', '아직 연결 전' in n1.inner_text('#app'))
+    N=b.new_context(); N.route(re.compile(r'.*/config\.js(\?.*)?$'), lambda r: r.fulfill(body='window.HEARIM_CONFIG=null;',content_type='application/javascript')); n1=N.new_page(); n1.goto(APP); n1.wait_for_timeout(300); check('연결 정보 없으면 안내만', '아직 연결 전' in n1.inner_text('#app'))
     check('화면 오류 없음', not errs, str(errs[:3]))
 finally:
     web.terminate(); db.terminate()
