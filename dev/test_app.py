@@ -208,6 +208,42 @@ try:
     jp=an.new_page(); jp.goto(APP+'?p='+fc); jp.wait_for_timeout(500); jp.locator('.ja').first.fill('씨발'); jp.click('#js'); jp.wait_for_timeout(600)
     check('다른 사람 화면: 걸러진 답·단추 안 보임 · 참여자가 낸 거친 말도 자기 결과에 안 나옴', ks(ap)==['다시발야구','새끼손가락','줄넘기'] and ap.locator('#bfb').count()==0 and jp.locator('#jr .cloud .w').count()==3 and '고마워요' in jp.inner_text('#jc')); an.close()
     fb.close(); d=t.locator('.poll[data-code="%s"] [data-act=del]'%fc); d.click(); d.click(); t.wait_for_timeout(900)
+    # ===== 퀴즈: 함께 풀기 (정답 넣기 · 정답 보이기) =====
+    def getc(p,auth=''):
+        try: return json.loads(urllib.request.urlopen(DBU+'/'+p+'.json'+('?auth='+auth if auth else '')).read())
+        except Exception as e: return getattr(e,'code',0)
+    t.reload(); t.wait_for_timeout(800)
+    t.fill('#mq','줄넘기는 유산소 운동이다'); t.click('#mox'); t.wait_for_timeout(100)
+    e0=[i.input_value() for i in t.locator('#mo input').all()]==['O','X'] and t.locator('#mans option').count()==3
+    t.select_option('#mans','0'); t.uncheck('#mask'); t.click('#mc'); t.wait_for_timeout(900)
+    Z=t.locator('.poll').first.get_attribute('data-code'); zm=dbget('polls/%s/meta'%Z)
+    check('퀴즈 만들기: OX로 채우기 · 정답은 만든 사람만 읽는 칸에 (설문 내용에는 없음 · 다른 사람은 못 읽음)', e0 and getc('keys/'+Z,'teacher1')=={'a':0} and getc('keys/'+Z)==401 and getc('keys/'+Z,'teacher2')==401 and 'rev' not in zm and 'a' not in zm and (list(zm['opts'].values()) if isinstance(zm['opts'],dict) else zm['opts'])==['O','X'])
+    zb=T.new_page(); zb.on('pageerror',lambda e: errs.append(str(e))); zb.goto(APP+'?b='+Z); zb.wait_for_timeout(1100)
+    za=b.new_context(viewport={'width':1200,'height':800}); setup(za); zv=za.new_page(); zv.goto(APP+'?b='+Z); zv.wait_for_timeout(900)
+    P1=b.new_context(viewport={'width':390,'height':800}); setup(P1); p1=P1.new_page(); p1.on('pageerror',lambda e: errs.append(str(e))); p1.goto(APP+'?p='+Z); p1.wait_for_timeout(500); p1.locator('.opt').nth(0).click(); p1.click('#js'); p1.wait_for_timeout(500)
+    P2=b.new_context(viewport={'width':390,'height':800}); setup(P2); p2=P2.new_page(); p2.on('pageerror',lambda e: errs.append(str(e))); p2.goto(APP+'?p='+Z); p2.wait_for_timeout(500); p2.locator('.opt').nth(1).click(); p2.click('#js'); p2.wait_for_timeout(500)
+    dbput('polls/%s/votes/%s'%(Z,'z%015d'%1),{'c':0,'at':{'.sv':'timestamp'}}); zb.wait_for_timeout(800)
+    check('정답 보이기 전: 만든 사람에게만 단추 · 어디에도 정답 표시 없음 · 참여자는 답 바꾸기 가능', '정답 보이기' in zb.inner_text('#bans') and zv.locator('#bans').count()==0 and zb.locator('.okt').count()==0 and zv.locator('.okt').count()==0 and '정답' not in p1.inner_text('#jc') and p1.locator('#jch').count()==1 and '3' in zb.inner_text('.b-count'))
+    zb.click('#bans'); zb.wait_for_timeout(800)
+    check('정답 보이기: 정답 막대에 표시와 정답률 · 다른 사람 화면에도 보임', dbget('polls/%s/meta/rev'%Z)==0 and zb.locator('.bar.ok').count()==1 and '정답' in zb.inner_text('.bar.ok') and '정답률 67%' in zb.inner_text('.b-count') and '정답 숨기기' in zb.inner_text('#bans') and zv.locator('.bar.ok').count()==1)
+    zb.click('#bgr'); zb.wait_for_timeout(250); e1=zb.locator('.cols .col.ok').count()==1 and zb.locator('.col-labs .okt').count()==1
+    zb.click('#bgr'); zb.wait_for_timeout(250); e2=zb.locator('.pie-leg .okt').count()==1; zb.click('#bgr'); zb.wait_for_timeout(250)
+    p1.click('#jre'); p1.wait_for_timeout(700); p2.click('#jre'); p2.wait_for_timeout(700)
+    check('정답 보이기: 세로 막대·원 그래프에도 표시 · 참여자는 결과 새로 보기로 맞았는지 확인 · 답 바꾸기는 사라짐', e1 and e2 and '맞았어요' in p1.inner_text('#jc') and '아쉬워요' in p2.inner_text('#jc') and '정답은 O' in p2.inner_text('#jc').replace('\n',' ') and p1.locator('#jch').count()==0 and p2.locator('#jr .bar.ok').count()==1)
+    P3=b.new_context(viewport={'width':390,'height':800}); setup(P3); p3=P3.new_page(); p3.goto(APP+'?p='+Z); p3.wait_for_timeout(600); r401=0
+    try: dbput('polls/%s/votes/%s'%(Z,'z%015d'%2),{'c':0,'at':{'.sv':'timestamp'}})
+    except Exception as e: r401=getattr(e,'code',0)
+    check('정답이 보인 뒤에는 새로 답할 수 없음 (안내와 정답만)', '정답이 공개되어' in p3.inner_text('#jc') and p3.locator('.opt').count()==0 and r401==401 and len(dbget('polls/%s/votes'%Z))==3); P3.close()
+    zb.keyboard.press('a'); zb.wait_for_timeout(800); e3=dbget('polls/%s/meta/rev'%Z) is None and zb.locator('.okt').count()==0 and zv.locator('.okt').count()==0
+    zv.keyboard.press('a'); zv.wait_for_timeout(500)
+    check('정답 숨기기 (a 글쇠) · 다른 사람은 정답을 보이게 할 수 없음', e3 and dbget('polls/%s/meta/rev'%Z) is None); za.close(); P1.close(); P2.close(); zb.close()
+    t.reload(); t.wait_for_timeout(900); t.locator('.poll[data-code="%s"] [data-act=edit]'%Z).click(); t.wait_for_timeout(500)
+    e4=t.input_value('#mans')=='0'; t.select_option('#mans','1'); t.click('#mc'); t.wait_for_timeout(900); e5=getc('keys/'+Z,'teacher1')=={'a':1}
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%Z).click(); t.wait_for_timeout(500); t.select_option('#mans',''); t.click('#mc'); t.wait_for_timeout(900)
+    check('퀴즈 고치기: 정답이 채워져 있고 · 바꾸기 · 없음으로 하면 정답이 지워짐', e4 and e5 and getc('keys/'+Z,'teacher1') is None and len(dbget('polls/%s/votes'%Z))==3)
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%Z).click(); t.wait_for_timeout(500); t.select_option('#mans','0'); t.click('#mc'); t.wait_for_timeout(900)
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%Z); d.click(); d.click(); t.wait_for_timeout(1000)
+    check('퀴즈 지우기: 정답도 함께 지워짐', dbget('polls/%s'%Z) is None and getc('keys/'+Z,'__admin') is None)
     # ===== 질문 잇기 (묶음) =====
     sibs=lambda c: (lambda v: (list(v.values()) if isinstance(v,dict) else v) or [])(dbget('polls/%s/meta/sib'%c))
     t.reload(); t.wait_for_timeout(800)

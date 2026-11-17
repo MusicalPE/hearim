@@ -74,6 +74,9 @@
           "wait": {
             ".validate": "newData.isBoolean()"
           },
+          "rev": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5"
+          },
           "$other": {
             ".validate": false
           }
@@ -81,7 +84,7 @@
         "votes": {
           ".write": "auth != null && !newData.exists() && root.child('polls').child($pid).child('meta').child('owner').val() == auth.uid",
           "$vid": {
-            ".write": "$vid.matches(/^[a-z0-9]{12,24}$/) && ((newData.exists() && root.child('polls').child($pid).child('meta').child('open').val() == true) || (!newData.exists() && auth != null && root.child('polls').child($pid).child('meta').child('owner').val() == auth.uid))",
+            ".write": "$vid.matches(/^[a-z0-9]{12,24}$/) && ((newData.exists() && root.child('polls').child($pid).child('meta').child('open').val() == true && !root.child('polls').child($pid).child('meta').child('rev').exists()) || (!newData.exists() && auth != null && root.child('polls').child($pid).child('meta').child('owner').val() == auth.uid))",
             ".validate": "newData.hasChild('at') && (newData.hasChild('c') || newData.hasChild('a'))",
             "c": {
               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9"
@@ -101,6 +104,19 @@
               ".validate": false
             }
           }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "keys": {
+      "$pid": {
+        ".read": "auth != null && root.child('polls').child($pid).child('meta').child('owner').val() == auth.uid",
+        ".write": "auth != null && root.child('polls').child($pid).child('meta').child('owner').val() == auth.uid",
+        ".validate": "newData.hasChildren(['a'])",
+        "a": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5"
         },
         "$other": {
           ".validate": false

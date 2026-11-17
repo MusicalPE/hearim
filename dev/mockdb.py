@@ -28,6 +28,9 @@ def sv(v):
 def allowed(path, val, auth):
     if path[:1] == ['__reset']: return True
     if path[:1] == ['users']: return len(path) >= 2 and auth == path[1]
+    if path[:1] == ['keys']:   # 정답: 그 설문을 만든 사람만
+        m = get(['polls', path[1], 'meta']) if len(path) >= 2 else None
+        return bool(auth) and m is not None and m.get('owner') == auth and len(path) == 2 and (val is None or (isinstance(val, dict) and set(val) == {'a'} and isinstance(val['a'], int) and 0 <= val['a'] <= 5))
     if path[:1] != ['polls'] or len(path) < 3 or not re.match(r'^[a-z0-9]{6}$', path[1]): return False
     meta = get(['polls', path[1], 'meta'])
     if path[2] == 'meta':
@@ -39,7 +42,7 @@ def allowed(path, val, auth):
         if len(path) == 3: return val is None and owner
         if not re.match(r'^[a-z0-9]{12,24}$', path[3]): return False
         if val is None: return owner
-        if not (len(path) == 4 and meta is not None and meta.get('open') is True and isinstance(val, dict)): return False
+        if not (len(path) == 4 and meta is not None and meta.get('open') is True and meta.get('rev') is None and isinstance(val, dict)): return False
         if 'a' in val:   # 적어서 내기: 답 1~5개, 20자까지
             a = val['a']; a = list(a.values()) if isinstance(a, dict) else a
             return isinstance(a, list) and 1 <= len(a) <= 5 and all(isinstance(x, str) and 1 <= len(x) <= 20 for x in a) and set(val) <= {'a', 'at'}
@@ -60,6 +63,9 @@ class H(BaseHTTPRequestHandler):
         path, auth = self.parts()
         if path[:1] == ['users'] and (len(path) < 2 or auth != path[1]): return self.out(401, {'error': 'Permission denied'})
         if path == ['polls']: return self.out(401, {'error': 'Permission denied'})
+        if path[:1] == ['keys']:
+            m = get(['polls', path[1], 'meta']) if len(path) >= 2 else None
+            if auth != '__admin' and not (auth and m is not None and m.get('owner') == auth): return self.out(401, {'error': 'Permission denied'})   # __admin: 시험에서 지워졌는지 들여다볼 때만
         self.out(200, get(path))
     def write(self, val):
         path, auth = self.parts()
