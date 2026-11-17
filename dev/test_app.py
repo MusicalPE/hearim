@@ -213,9 +213,14 @@ try:
         try: return json.loads(urllib.request.urlopen(DBU+'/'+p+'.json'+('?auth='+auth if auth else '')).read())
         except Exception as e: return getattr(e,'code',0)
     t.reload(); t.wait_for_timeout(800)
-    t.fill('#mq','줄넘기는 유산소 운동이다'); t.click('#mox'); t.wait_for_timeout(100)
+    k0=t.locator('#mtw').is_visible() and not t.locator('#manw').is_visible() and not t.locator('#mox').is_visible() and not t.locator('#mqzw').is_visible() and t.locator('#maskw').is_visible() and '설문 만들기' in t.inner_text('#mc')
+    t.click('#tb1'); t.wait_for_timeout(100)
+    k1=(not t.locator('#mtw').is_visible()) and t.locator('#manw').is_visible() and t.locator('#mox').is_visible() and t.locator('#mqzw').is_visible() and not t.locator('#maskw').is_visible() and '퀴즈 만들기' in t.inner_text('#mc') and '퀴즈 만들기' in t.inner_text('#mh')
+    t.fill('#mq','줄넘기는 유산소 운동이다'); t.click('#mox'); t.wait_for_timeout(100); t.click('#mc'); t.wait_for_timeout(300); k2='정답을 골라 주세요' in t.inner_text('#mm')
+    t.click('#tb0'); k3=t.locator('#mtw').is_visible() and not t.locator('#manw').is_visible(); t.click('#tb1'); t.wait_for_timeout(100)
+    check('만들기 갈래: 설문 만들기(기본)에는 정답·푸는 방식 없음 · 퀴즈 만들기에는 정답이 꼭 있어야 함', k0 and k1 and k2 and k3, '%s %s %s %s'%(k0,k1,k2,k3))
     e0=[i.input_value() for i in t.locator('#mo input').all()]==['O','X'] and t.locator('#mans option').count()==3
-    t.select_option('#mans','0'); t.uncheck('#mask'); t.click('#mc'); t.wait_for_timeout(900)
+    t.select_option('#mans','0'); t.click('#mc'); t.wait_for_timeout(900)
     Z=t.locator('.poll').first.get_attribute('data-code'); zm=dbget('polls/%s/meta'%Z)
     check('퀴즈 만들기: OX로 채우기 · 정답은 만든 사람만 읽는 칸에 (설문 내용에는 없음 · 다른 사람은 못 읽음)', e0 and getc('keys/'+Z,'teacher1')=={'a':0} and getc('keys/'+Z)==401 and getc('keys/'+Z,'teacher2')==401 and 'rev' not in zm and 'a' not in zm and (list(zm['opts'].values()) if isinstance(zm['opts'],dict) else zm['opts'])==['O','X'])
     zb=T.new_page(); zb.on('pageerror',lambda e: errs.append(str(e))); zb.goto(APP+'?b='+Z); zb.wait_for_timeout(1100)
@@ -239,11 +244,76 @@ try:
     check('정답 숨기기 (a 글쇠) · 다른 사람은 정답을 보이게 할 수 없음', e3 and dbget('polls/%s/meta/rev'%Z) is None); za.close(); P1.close(); P2.close(); zb.close()
     t.reload(); t.wait_for_timeout(900); t.locator('.poll[data-code="%s"] [data-act=edit]'%Z).click(); t.wait_for_timeout(500)
     e4=t.input_value('#mans')=='0'; t.select_option('#mans','1'); t.click('#mc'); t.wait_for_timeout(900); e5=getc('keys/'+Z,'teacher1')=={'a':1}
-    t.locator('.poll[data-code="%s"] [data-act=edit]'%Z).click(); t.wait_for_timeout(500); t.select_option('#mans',''); t.click('#mc'); t.wait_for_timeout(900)
-    check('퀴즈 고치기: 정답이 채워져 있고 · 바꾸기 · 없음으로 하면 정답이 지워짐', e4 and e5 and getc('keys/'+Z,'teacher1') is None and len(dbget('polls/%s/votes'%Z))==3)
-    t.locator('.poll[data-code="%s"] [data-act=edit]'%Z).click(); t.wait_for_timeout(500); t.select_option('#mans','0'); t.click('#mc'); t.wait_for_timeout(900)
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%Z).click(); t.wait_for_timeout(500); t.click('#tb0'); t.click('#mc'); t.wait_for_timeout(900)
+    check('퀴즈 고치기: 정답이 채워져 있고 · 바꾸기 · 설문 갈래로 바꿔 저장하면 정답이 지워짐', e4 and e5 and getc('keys/'+Z,'teacher1') is None and len(dbget('polls/%s/votes'%Z))==3)
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%Z).click(); t.wait_for_timeout(500); t.click('#tb1'); t.select_option('#mans','0'); t.click('#mc'); t.wait_for_timeout(900)
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%Z); d.click(); d.click(); t.wait_for_timeout(1000)
     check('퀴즈 지우기: 정답도 함께 지워짐', dbget('polls/%s'%Z) is None and getc('keys/'+Z,'__admin') is None)
+    # ===== 퀴즈: 혼자 풀기 (번호 입장 · 맞은 개수 · 분포) =====
+    sibs=lambda c: (lambda v: (list(v.values()) if isinstance(v,dict) else v) or [])(dbget('polls/%s/meta/sib'%c))
+    t.reload(); t.wait_for_timeout(800); t.click('#tb1')
+    t.fill('#mq','줄넘기는 유산소 운동이다'); t.click('#mox'); t.select_option('#mans','0'); t.select_option('#mqz','solo'); t.wait_for_timeout(100)
+    e0=t.locator('#mqs').is_visible(); t.fill('#msn','5'); t.click('#mc'); t.wait_for_timeout(900)
+    Q1=t.locator('.poll').first.get_attribute('data-code'); q1=dbget('polls/%s/meta'%Q1)
+    t.locator('.poll[data-code="%s"] [data-act=add]'%Q1).click(); t.wait_for_timeout(300)
+    e1=t.input_value('#mqz')=='solo' and t.input_value('#msn')=='5'
+    t.fill('#mq','줄을 돌리는 힘은 주로 어디에서?')
+    for i,o in enumerate(['어깨','허리','손목']):
+        if i>=2: t.click('#ma')
+        t.locator('#mo input').nth(i).fill(o)
+    t.select_option('#mans','2'); t.click('#mc'); t.wait_for_timeout(1200)
+    Q2=sibs(Q1)[1] if len(sibs(Q1))==2 else ''; q2=dbget('polls/%s/meta'%Q2) if Q2 else {}
+    check('혼자 풀기 만들기: 학생 수 · 결과 보여 주기는 꺼짐 · 이은 질문도 같은 방식(스스로 넘어가기)', e0 and e1 and q1.get('qz')=='solo' and q1.get('seats')==5 and q1.get('res') is False and q2.get('qz')=='solo' and q2.get('seats')==5 and q2.get('flow')=='self' and getc('keys/'+Q2,'teacher1')=={'a':2})
+    def student(num, a1, a2):
+        C=b.new_context(viewport={'width':390,'height':800}); setup(C); pg=C.new_page(); pg.on('pageerror',lambda e: errs.append(str(e))); pg.goto(APP+'?p='+Q1); pg.wait_for_timeout(700)
+        info={'seats':pg.locator('.seat').count(),'dis':pg.locator('.seat:disabled').count()}
+        pg.locator('.seat[data-n="%d"]'%num).click(); pg.click('#jsn'); pg.wait_for_timeout(800)
+        info['form']=pg.inner_text('#jc')
+        pg.locator('.opt').nth(a1).click(); pg.click('#js'); pg.wait_for_timeout(600); info['done1']=pg.inner_text('#jc'); info['jr']=pg.locator('#jr').count()
+        if a2 is not None:
+            pg.click('#jnx'); pg.wait_for_timeout(800); pg.locator('.opt').nth(a2).click(); pg.click('#js'); pg.wait_for_timeout(700); info['done2']=pg.inner_text('#jc')
+        return pg, info
+    s1,i1=student(3,0,2); s2,i2=student(1,1,2); s3,i3=student(5,0,None)
+    r401=0
+    try: dbput('seats/%s/3'%Q1,True)
+    except Exception as e: r401=getattr(e,'code',0)
+    seats=dbget('seats/%s'%Q1); skeys=getc('skeys/'+Q1,'teacher1')
+    check('번호 고르기: 번호 5개 · 먼저 고른 번호는 다른 친구가 못 고름 · 화면에 내 번호', i1['seats']==5 and i1['dis']==0 and i2['dis']==1 and i3['dis']==2 and '3번' in i1['form'] and '질문 1 / 2' in i1['form'] and r401==401 and sorted(seats.keys() if isinstance(seats,dict) else [])==['1','3','5'], '%s %s'%(i2,seats))
+    check('번호 열쇠는 만든 사람만 읽음 · 풀 때는 결과가 안 보이고 다음 질문으로 · 다 풀면 기다리라는 안내', getc('skeys/'+Q1)==401 and getc('skeys/'+Q1,'teacher2')==401 and len(skeys)==3 and i1['jr']==0 and '다음 질문' in i1['done1'] and '다 풀었어요' in i1['done2'] and '맞았어요' not in i1['done2'] and len(dbget('polls/%s/votes'%Q1))==3 and len(dbget('polls/%s/votes'%Q2))==2)
+    qb=T.new_page(); qb.on('pageerror',lambda e: errs.append(str(e))); qb.goto(APP+'?b='+Q1); qb.wait_for_timeout(1200)
+    qa=b.new_context(viewport={'width':1200,'height':800}); setup(qa); qv=qa.new_page(); qv.goto(APP+'?b='+Q1); qv.wait_for_timeout(900)
+    e2=qb.locator('#bsc').count()==1 and qb.locator('#btb').count()==1 and qv.locator('#bsc').count()==0 and qv.locator('#btb').count()==0 and qv.locator('#bds').count()==0
+    qb.click('#bsc'); qb.wait_for_timeout(1500)
+    pid=lambda nn: skeys[str(nn)] if isinstance(skeys,dict) else skeys[nn]
+    sc=[dbget('scores/%s/%s'%(Q1,pid(nn))) for nn in (3,1,5)]; dist=dbget('scores/%s/dist'%Q1)
+    dd=list(dist['d'].values()) if isinstance(dist['d'],dict) else dist['d']
+    check('결과 알려 주기: 번호마다 맞은 개수(3번 2개 · 1번 1개 · 5번 1개) · 분포 저장 · 점수는 통째로 못 읽음', e2 and sc==[{'c':2,'n':2},{'c':1,'n':2},{'c':1,'n':2}] and dd==[0,2,1] and dist['k']==3 and getc('scores/'+Q1)==401, '%s %s'%(sc,dd))
+    qv.wait_for_timeout(900); e3=qv.locator('#bds').count()==1; qv.click('#bds'); qv.wait_for_timeout(300)
+    check('분포 화면: 맞은 개수별 사람 수와 문제별 정답률만 (번호 없음) · 다른 사람도 볼 수 있음', '퀴즈 결과' in qb.inner_text('#bm') and qb.locator('.cols .col').count()==3 and '2명' in qb.inner_text('.cols') and '정답률 67%' in qb.inner_text('.b-rates') and '정답률 100%' in qb.inner_text('.b-rates') and '번' not in qb.inner_text('.cols') and e3 and qv.locator('.cols .col').count()==3 and qv.locator('table.qt').count()==0)
+    s1.click('#jsc'); s1.wait_for_timeout(700); s2.click('#jsc'); s2.wait_for_timeout(700)
+    check('참여자: 내 결과 보기로 맞은 개수만 확인', '2문제 중 2개' in s1.inner_text('#jq') and '2문제 중 1개' in s2.inner_text('#jq'))
+    v2=dbget('polls/%s/votes/%s'%(Q1,pid(1)))['c']
+    e7=s1.locator('#jrt').count()==0 and s2.locator('#jrt').count()==1 and s2.locator('#jch').count()==0
+    s2.click('#jrt'); s2.wait_for_timeout(900); e8='다시 풀기 1 / 1' in s2.inner_text('#jc') and '줄넘기는 유산소 운동이다' in s2.inner_text('#jc')
+    s2.locator('.opt').nth(1).click(); s2.wait_for_timeout(200); e9='다시 골라' in s2.inner_text('#jm') and s2.locator('.opt').nth(1).is_disabled()
+    s2.locator('.opt').nth(0).click(); s2.wait_for_timeout(1400); e10='다 풀었어요' in s2.inner_text('#jc')
+    s2.click('#jbk'); s2.wait_for_timeout(700)
+    s3.goto(APP+'?p='+Q1); s3.wait_for_timeout(1000); s3.click('#jrt'); s3.wait_for_timeout(900); e11='질문 2' in s3.inner_text('#jc') and s3.locator('.opt').count()==3
+    check('틀린 문제 다시 풀기: 틀린 사람에게만 · 맞을 때까지 골라 봄 · 안 푼 문제도 나옴 · 처음 낸 답과 점수는 그대로', e7 and e8 and e9 and e10 and e11 and v2==1 and dbget('polls/%s/votes/%s'%(Q1,pid(1)))['c']==1 and dbget('scores/%s/%s'%(Q1,pid(1)))=={'c':1,'n':2} and '2문제 중 1개' in s2.inner_text('#jq'), '%s %s %s %s %s'%(e7,e8,e9,e10,e11))
+    qb.click('#bqv'); qb.wait_for_timeout(300); qb.click('#btb'); qb.wait_for_timeout(1200)
+    tb=qb.inner_text('table.qt') if qb.locator('table.qt').count() else ''
+    e4='3번' in tb and '선생님만' in qb.inner_text('#bm') and qb.locator('table.qt tr').count()==4
+    qb.click('#bsh'); qb.wait_for_timeout(400); e5=qb.locator('table.qt').count()==0; qb.click('#bx'); qb.wait_for_timeout(300)
+    check('번호별 결과: 만든 사람만 · 발표 모드로 가면 표가 사라짐', e4 and e5, tb[:80])
+    s1.goto(APP+'?p='+Q1); s1.wait_for_timeout(800); e6=s1.locator('.seat').count()==0 and '고마워요' in s1.inner_text('#jc') and '3번' not in '' 
+    armed_rs=qb.locator('#brs'); armed_rs.click(); armed_rs.click(); qb.wait_for_timeout(1500)
+    s1.goto(APP+'?p='+Q1); s1.wait_for_timeout(800)
+    check('같은 기기로 다시 오면 번호를 다시 고르지 않음 · 퀴즈 처음부터: 번호·답·결과가 모두 지워지고 다시 번호 고르기', e6 and dbget('seats/%s'%Q1) is None and getc('skeys/'+Q1,'__admin') is None and getc('scores/'+Q1,'__admin') is None and dbget('polls/%s/votes'%Q1) is None and dbget('polls/%s/votes'%Q2) is None and s1.locator('.seat').count()==5 and s1.locator('.seat:disabled').count()==0)
+    for x in (s1,s2,s3): x.context.close()
+    qa.close(); qb.close()
+    t.reload(); t.wait_for_timeout(900)
+    for c in (Q2,Q1):
+        d=t.locator('.poll[data-code="%s"] [data-act=del]'%c); d.click(); d.click(); t.wait_for_timeout(1000)
     # ===== 질문 잇기 (묶음) =====
     sibs=lambda c: (lambda v: (list(v.values()) if isinstance(v,dict) else v) or [])(dbget('polls/%s/meta/sib'%c))
     t.reload(); t.wait_for_timeout(800)
@@ -327,12 +397,12 @@ try:
     check('확인한 뒤 띄우기: 발표 모드에서는 목록이 안 보임 · 고치기로 끌 수 있음', e16 and e17 and dbget('polls/%s/meta/mod'%M) is None and len(hl(M))>=3)
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%M); d.click(); d.click(); t.wait_for_timeout(900)
     # ===== 사용 안내 · 설문 수 상한 =====
-    t.locator('details.guide summary').click(); check('첫 화면 사용 안내', '30개까지' in t.inner_text('details.guide') and '구글 로그인' in t.inner_text('details.guide'))
-    for i in range(30):
+    t.locator('details.guide summary').click(); check('첫 화면 사용 안내', '100개까지' in t.inner_text('details.guide') and '구글 로그인' in t.inner_text('details.guide'))
+    for i in range(100):
         c='zz%04d'%i; dbput('polls/%s/meta'%c,{'owner':'teacher1','q':'상한 시험 %d'%i,'opts':['가','나'],'open':True,'ask':False,'res':True,'at':1000+i},'teacher1'); dbput('users/teacher1/polls/%s'%c,1000+i,'teacher1')
-    t.reload(); t.wait_for_timeout(1500); n0=len(dbget('users/teacher1/polls?auth=teacher1'.replace('?auth=teacher1','')) or {}) if False else t.locator('.poll').count()
+    t.reload(); t.wait_for_timeout(5000); n0=len(dbget('users/teacher1/polls?auth=teacher1'.replace('?auth=teacher1','')) or {}) if False else t.locator('.poll').count()
     t.fill('#mq','서른한 번째'); t.locator('#mo input').nth(0).fill('가'); t.locator('#mo input').nth(1).fill('나'); t.click('#mc'); t.wait_for_timeout(600)
-    check('설문 수 상한: 30개가 넘으면 더 못 만들고 안내', '30개까지' in t.inner_text('#mm') and t.locator('.poll').count()==n0 and n0>=30)
+    check('설문 수 상한: 100개가 넘으면 더 못 만들고 안내', '100개까지' in t.inner_text('#mm') and t.locator('.poll').count()==n0 and n0>=100)
     t.click('#lo'); t.wait_for_timeout(300); check('로그아웃 → 로그인 단추', t.locator('#lg').count()==1)
     # 연결 정보가 없을 때
     N=b.new_context(); N.route(re.compile(r'.*/config\.js(\?.*)?$'), lambda r: r.fulfill(body='window.HEARIM_CONFIG=null;',content_type='application/javascript')); n1=N.new_page(); n1.goto(APP); n1.wait_for_timeout(300); check('연결 정보 없으면 안내만', '아직 연결 전' in n1.inner_text('#app'))

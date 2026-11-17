@@ -31,6 +31,14 @@ def allowed(path, val, auth):
     if path[:1] == ['keys']:   # 정답: 그 설문을 만든 사람만
         m = get(['polls', path[1], 'meta']) if len(path) >= 2 else None
         return bool(auth) and m is not None and m.get('owner') == auth and len(path) == 2 and (val is None or (isinstance(val, dict) and set(val) == {'a'} and isinstance(val['a'], int) and 0 <= val['a'] <= 5))
+    if path[:1] in (['seats'], ['skeys'], ['scores']) and len(path) >= 2:   # 퀴즈: 번호표·번호 열쇠·점수
+        m = get(['polls', path[1], 'meta']); owner = bool(auth) and m is not None and m.get('owner') == auth
+        if path[0] == 'scores': return owner
+        if len(path) == 2: return owner and val is None
+        if len(path) != 3 or not re.match(r'^[0-9]{1,2}$', path[2]): return False
+        if val is None: return owner
+        good = (val is True) if path[0] == 'seats' else (isinstance(val, str) and re.match(r'^[a-z0-9]{16}$', val) is not None)
+        return good and (get(path) is None or owner)
     if path[:1] != ['polls'] or len(path) < 3 or not re.match(r'^[a-z0-9]{6}$', path[1]): return False
     meta = get(['polls', path[1], 'meta'])
     if path[2] == 'meta':
@@ -63,6 +71,9 @@ class H(BaseHTTPRequestHandler):
         path, auth = self.parts()
         if path[:1] == ['users'] and (len(path) < 2 or auth != path[1]): return self.out(401, {'error': 'Permission denied'})
         if path == ['polls']: return self.out(401, {'error': 'Permission denied'})
+        if path[:1] == ['skeys'] or (path[:1] == ['scores'] and len(path) < 3):   # 번호 열쇠는 만든 사람만 · 점수는 통째로 못 읽음
+            m = get(['polls', path[1], 'meta']) if len(path) >= 2 else None
+            if auth != '__admin' and not (path[0] == 'skeys' and auth and m is not None and m.get('owner') == auth): return self.out(401, {'error': 'Permission denied'})
         if path[:1] == ['keys']:
             m = get(['polls', path[1], 'meta']) if len(path) >= 2 else None
             if auth != '__admin' and not (auth and m is not None and m.get('owner') == auth): return self.out(401, {'error': 'Permission denied'})   # __admin: 시험에서 지워졌는지 들여다볼 때만
