@@ -39,7 +39,11 @@ def allowed(path, val, auth):
         if len(path) == 3: return val is None and owner
         if not re.match(r'^[a-z0-9]{12,24}$', path[3]): return False
         if val is None: return owner
-        return len(path) == 4 and meta is not None and meta.get('open') is True and isinstance(val, dict) and isinstance(val.get('c'), int) and 0 <= val['c'] <= 9 and len(str(val.get('t', ''))) <= 200
+        if not (len(path) == 4 and meta is not None and meta.get('open') is True and isinstance(val, dict)): return False
+        if 'a' in val:   # 적어서 내기: 답 1~5개, 20자까지
+            a = val['a']; a = list(a.values()) if isinstance(a, dict) else a
+            return isinstance(a, list) and 1 <= len(a) <= 5 and all(isinstance(x, str) and 1 <= len(x) <= 20 for x in a) and set(val) <= {'a', 'at'}
+        return isinstance(val.get('c'), int) and 0 <= val['c'] <= 9 and len(str(val.get('t', ''))) <= 200
     return False
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass

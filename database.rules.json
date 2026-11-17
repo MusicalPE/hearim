@@ -19,32 +19,78 @@
         ".read": "$pid.matches(/^[a-z0-9]{6}$/)",
         "meta": {
           ".write": "auth != null && $pid.matches(/^[a-z0-9]{6}$/) && ((!data.exists() && newData.child('owner').val() == auth.uid) || data.child('owner').val() == auth.uid)",
-          ".validate": "newData.hasChildren(['owner', 'q', 'opts', 'open', 'at'])",
-          "owner": { ".validate": "newData.isString() && newData.val() == auth.uid" },
-          "q": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200" },
-          "opts": {
-            "$i": { ".validate": "$i.matches(/^[0-9]$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" }
+          ".validate": "newData.hasChildren(['owner', 'q', 'open', 'at']) && (newData.hasChild('opts') || newData.child('type').val() == 'text')",
+          "owner": {
+            ".validate": "newData.isString() && newData.val() == auth.uid"
           },
-          "open": { ".validate": "newData.isBoolean()" },
-          "ask": { ".validate": "newData.isBoolean()" },
-          "res": { ".validate": "newData.isBoolean()" },
-          "link": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().matches(/^https:\\/\\//)" },
-          "linkLabel": { ".validate": "newData.isString() && newData.val().length <= 30" },
-          "at": { ".validate": "newData.isNumber()" },
-          "$other": { ".validate": false }
+          "q": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "opts": {
+            "$i": {
+              ".validate": "$i.matches(/^[0-9]$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+            }
+          },
+          "open": {
+            ".validate": "newData.isBoolean()"
+          },
+          "ask": {
+            ".validate": "newData.isBoolean()"
+          },
+          "res": {
+            ".validate": "newData.isBoolean()"
+          },
+          "link": {
+            ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().matches(/^https:\\/\\//)"
+          },
+          "linkLabel": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "type": {
+            ".validate": "newData.val() == 'text'"
+          },
+          "max": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5"
+          },
+          "hide": {
+            "$i": {
+              ".validate": "$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
         },
         "votes": {
           ".write": "auth != null && !newData.exists() && root.child('polls').child($pid).child('meta').child('owner').val() == auth.uid",
           "$vid": {
             ".write": "$vid.matches(/^[a-z0-9]{12,24}$/) && ((newData.exists() && root.child('polls').child($pid).child('meta').child('open').val() == true) || (!newData.exists() && auth != null && root.child('polls').child($pid).child('meta').child('owner').val() == auth.uid))",
-            ".validate": "newData.hasChildren(['c', 'at'])",
-            "c": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9" },
-            "t": { ".validate": "newData.isString() && newData.val().length <= 200" },
-            "at": { ".validate": "newData.val() == now" },
-            "$other": { ".validate": false }
+            ".validate": "newData.hasChild('at') && (newData.hasChild('c') || newData.hasChild('a'))",
+            "c": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9"
+            },
+            "t": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            },
+            "a": {
+              "$i": {
+                ".validate": "$i.matches(/^[0-4]$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+              }
+            },
+            "at": {
+              ".validate": "newData.val() == now"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         },
-        "$other": { ".validate": false }
+        "$other": {
+          ".validate": false
+        }
       }
     }
   }

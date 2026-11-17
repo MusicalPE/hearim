@@ -76,6 +76,27 @@
   .cmt { padding: 10px 12px; border-left: 4px solid var(--brand); background: var(--bg); border-radius: 0 10px 10px 0; margin-bottom: 8px; }
   .cmt small { color: var(--ink-3); display: block; }
 
+  /* 적어서 내기: 답 구름 (같은 답이 모이면 글씨가 커짐) */
+  select { font: inherit; color: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .cloud { display: flex; flex-wrap: wrap; gap: .45em .9em; align-items: center; justify-content: center; align-content: center; padding: 8px 0 14px; }
+  .cloud .w { border: 0; background: none; padding: .08em .18em; font-weight: 800; line-height: 1.15; color: var(--brand-dark); font-size: max(15px, var(--fs, 1em)); transition: font-size .6s ease, color .3s; cursor: default; border-radius: .25em; font-family: inherit; }
+  .cloud .w sup { font-size: .42em; font-weight: 700; opacity: .8; margin-left: .15em; }
+  .cloud .w.c1 { color: var(--brand); } .cloud .w.c2 { color: var(--ink-2); }
+  .cloud .w.lead { color: #9A6400; }
+  .cloud .w.new { animation: pop .7s ease; }
+  @keyframes pop { from { opacity: 0; transform: scale(.4); } 60% { transform: scale(1.12); } to { opacity: 1; transform: none; } }
+  body.board .cloud { display: block; position: relative; height: 56vh; min-height: 300px; padding: 0; }
+  body.board.show .cloud { height: 64vh; }
+  body.board .cloud .w { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; transition: left .7s ease, top .7s ease, font-size .6s ease, color .3s; }
+  body.board .cloud .w.new { animation-name: popc; }
+  @keyframes popc { from { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 60% { transform: translate(-50%, -50%) scale(1.12); } to { opacity: 1; transform: translate(-50%, -50%); } }
+  .cloud-meas { position: absolute; left: -9999px; top: 0; visibility: hidden; white-space: nowrap; font-weight: 800; line-height: 1.15; padding: .08em .18em; }
+  .cloud-meas sup { font-size: .42em; margin-left: .15em; }
+  body.board .cloud .w { color: #DDF3F3; } body.board .cloud .w.c1 { color: #8FDFE0; } body.board .cloud .w.c2 { color: #C9D1DB; }
+  body.board .cloud .w.lead { color: #FFC857; }
+  body.board .cloud.own .w { cursor: pointer; } body.board .cloud.own .w:hover { text-decoration: line-through; }
+  @media (prefers-reduced-motion: reduce) { .cloud .w { transition: none; } .cloud .w.new { animation: none; } }
+
   /* 만든 설문 목록 */
   .poll { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; background: #fff; }
   .poll h3 { margin: 0 0 4px; font-size: 1.05em; }
@@ -134,7 +155,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.1.1';
+const VERSION = '1.2.0';
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
 const Q = new URLSearchParams(location.search);
@@ -159,6 +180,89 @@ function rest(path, opt){
       if (!r.ok) { const e = new Error(j && j.error || ('HTTP ' + r.status)); e.status = r.status; throw e; }
       return j;
     });
+  });
+}
+
+/* ---- 적어서 내기(주관식) ---- */
+const isText = function(meta){ return !!meta && meta.type === 'text'; };
+const maxOf = function(meta){ return Math.min(5, Math.max(1, Number(meta && meta.max) || 1)); };
+const listOf = function(o){ if (!o) return []; return Array.isArray(o) ? o : Object.keys(o).sort(function(a, b){ return a - b; }).map(function(k){ return o[k]; }); };
+// 답에는 글자(한글·영어 등)와 숫자만 남김 — 기호·그림 문자는 뺌
+const cleanAns = function(s){ let k = String(s == null ? '' : s); try { k = k.replace(new RegExp('[^\\p{L}\\p{N}\\s]', 'gu'), ''); } catch (e) { k = k.replace(/[!-\/:-@\[-`{-~]/g, ''); } return k.replace(/\s+/g, ' ').trim().slice(0, 20); };
+const ansOf = function(v){ return listOf(v && v.a).filter(function(x){ return typeof x === 'string'; }).map(cleanAns).filter(Boolean); };
+const hideOf = function(meta){ return listOf(meta && meta.hide).filter(function(x){ return typeof x === 'string' && x; }); };
+// 같은 답으로 셀 기준: 띄어쓰기·문장부호·영어 대소문자만 다른 답
+const normAns = function(s){ let k = String(s).toLowerCase(); try { k = k.replace(new RegExp('[\\s\\p{P}\\p{S}]', 'gu'), ''); } catch (e) { k = k.replace(/\s/g, ''); } return k || String(s).trim().toLowerCase(); };
+const hashOf = function(s){ let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
+function tallyText(meta, votes){
+  const hid = {}, map = {}, items = []; let total = 0;
+  hideOf(meta).forEach(function(k){ hid[k] = 1; });
+  Object.keys(votes || {}).map(function(k){ return votes[k]; }).filter(function(v){ return v && ansOf(v).length; }).sort(function(a, b){ return (a.at || 0) - (b.at || 0); }).forEach(function(v){
+    total++; const seen = {};
+    ansOf(v).forEach(function(a){
+      const k = normAns(a); if (seen[k]) return; seen[k] = 1; if (hid[k]) return;
+      let it = map[k]; if (!it) { it = map[k] = { key: k, label: a, count: 0, forms: {} }; items.push(it); }
+      it.count++; it.forms[a] = (it.forms[a] || 0) + 1; if (it.forms[a] > (it.forms[it.label] || 0)) it.label = a;
+    });
+  });
+  return { total: total, items: items, max: items.reduce(function(m, i){ return Math.max(m, i.count); }, 0) };
+}
+const sizeOf = function(it, t){ return t.max > 1 ? Math.sqrt((it.count - 1) / (t.max - 1)) : .3; };
+// 참여 화면용: 한 번 그리는 구름
+function cloudHtml(t){
+  if (!t.items.length) return '<p class="hint">아직 답이 없어요.</p>';
+  return '<div class="cloud">' + t.items.slice().sort(function(a, b){ return b.count - a.count; }).slice(0, 40).map(function(it){
+    return '<span class="w c' + (hashOf(it.key) % 3) + (t.max > 1 && it.count === t.max ? ' lead' : '') + '" style="--fs:' + (1 + 1.3 * sizeOf(it, t)).toFixed(2) + 'em">' + esc(it.label) + (it.count > 1 ? '<sup>' + it.count + '</sup>' : '') + '</span>';
+  }).join('') + '</div>';
+}
+// 결과 화면용: 글자를 화면 여기저기에 흩어 놓음. 있던 글자는 제자리에서 커지고(겹치면 비켜 감), 새 답은 빈 곳에 새로 나타남
+let cloudMeas = null;
+function cloudUpdate(el, t, onPick){
+  let list = t.items.map(function(it, i){ it.i = i; return it; });
+  if (list.length > 60) list = list.slice().sort(function(a, b){ return b.count - a.count || b.i - a.i; }).slice(0, 60).sort(function(a, b){ return a.i - b.i; });
+  const f = list.length > 40 ? .7 : list.length > 20 ? .85 : 1, have = {}, keep = {}, first = !el.dataset.on;
+  el.dataset.on = '1';
+  Array.prototype.forEach.call(el.children, function(c){ have[c.dataset.k] = c; });
+  const W = el.clientWidth || 600, H = el.clientHeight || 300, vw = window.innerWidth / 100;
+  if (!cloudMeas) { cloudMeas = document.createElement('span'); cloudMeas.className = 'cloud-meas'; document.body.appendChild(cloudMeas); }
+  list.forEach(function(it){
+    let w = have[it.key];
+    if (!w) {
+      w = document.createElement('button'); w.type = 'button'; w.className = 'w c' + (hashOf(it.key) % 3) + (first ? '' : ' new'); w.dataset.k = it.key;
+      w.appendChild(document.createElement('span')); w.appendChild(document.createElement('sup'));
+      w.addEventListener('click', function(){ onPick(it.key); }); el.appendChild(w);
+    }
+    keep[it.key] = 1; it.el = w;
+    // 글자 크기(px)와 차지할 넓이를 미리 잼. 너무 길면 칸 안에 들어가게 줄임
+    let px = Math.max(15, (1.9 + 3.4 * sizeOf(it, t)) * f * vw);
+    cloudMeas.innerHTML = esc(it.label) + (it.count > 1 ? '<sup>' + it.count + '</sup>' : '');
+    cloudMeas.style.fontSize = px + 'px'; let bw = cloudMeas.offsetWidth;
+    if (bw > W * .92) { px = Math.max(12, px * W * .92 / bw); cloudMeas.style.fontSize = px + 'px'; bw = cloudMeas.offsetWidth; }
+    it.w = bw; it.h = cloudMeas.offsetHeight;
+    w.style.setProperty('--fs', px.toFixed(1) + 'px');
+    w.classList.toggle('lead', t.max > 1 && it.count === t.max);
+    w.firstChild.textContent = it.label; w.lastChild.textContent = it.count > 1 ? it.count : '';
+    w.setAttribute('aria-label', it.label + ' ' + it.count + '명');
+  });
+  Object.keys(have).forEach(function(k){ if (!keep[k]) have[k].remove(); });
+  // 자리 잡기: 큰 글자부터. 제자리가 비어 있으면 그대로, 겹치면 빈 곳을 찾아 옮김
+  const placed = [], gap = 10;
+  const over = function(x, y, it){ let o = 0; for (let k = 0; k < placed.length; k++) { const p = placed[k], dx = (it.w + p.w) / 2 + gap - Math.abs(x - p.x), dy = (it.h + p.h) / 2 + gap - Math.abs(y - p.y); if (dx > 0 && dy > 0) o += dx * dy; } return o; };
+  const clamp = function(v, half, size){ return size <= half * 2 ? size / 2 : Math.min(size - half, Math.max(half, v)); };
+  list.slice().sort(function(a, b){ return b.count - a.count || a.i - b.i; }).forEach(function(it){
+    const w = it.el, old = w._p; let x = 0, y = 0, ok = false;
+    if (old) { x = clamp(old.x * W, it.w / 2, W); y = clamp(old.y * H, it.h / 2, H); ok = !over(x, y, it); }
+    if (!ok) {
+      let best = Infinity, bx = W / 2, by = H / 2;
+      for (let n = 0; n < 260; n++) {
+        const spread = Math.min(1, .35 + n / 120);
+        const cx = clamp(W / 2 + (Math.random() - .5) * W * spread, it.w / 2, W), cy = clamp(H / 2 + (Math.random() - .5) * H * spread, it.h / 2, H), o = over(cx, cy, it);
+        if (o < best) { best = o; bx = cx; by = cy; if (!o) break; }
+      }
+      x = bx; y = by;
+    }
+    w._p = { x: x / W, y: y / H }; placed.push({ x: x, y: y, w: it.w, h: it.h });
+    w.style.left = (x / W * 100).toFixed(2) + '%'; w.style.top = (y / H * 100).toFixed(2) + '%';
   });
 }
 
@@ -208,7 +312,30 @@ function pageJoin(code){
   let meta = null, pick = -1, prev = null;
   try { prev = JSON.parse(ls.get(doneKey) || 'null'); } catch (e) {}
 
+  function formText(){
+    const mx = maxOf(meta), pa = prev && prev.a || []; let h = '';
+    for (let i = 0; i < mx; i++) h += '<input type="text" class="ja" maxlength="20" autocomplete="off" aria-label="답 ' + (i + 1) + '" placeholder="' + (mx > 1 ? '답 ' + (i + 1) : '짧게 적어 주세요') + '" value="' + esc(pa[i] || '') + '" style="margin-bottom:8px">';
+    box.innerHTML = '<p class="hint">' + (prev ? '이미 낸 답을 바꿀 수 있어요' : (mx > 1 ? '답을 ' + mx + '개까지 적을 수 있어요' : '답을 적어 주세요')) + ' · 20자까지 · 기호는 빠져요</p><p class="q">' + esc(meta.q) + '</p>' + h +
+      '<div id="jm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="js" style="flex:1">' + (prev ? '바꿔서 내기' : '내기') + '</button></div>' +
+      '<p class="hint" style="margin:12px 0 0">이름 없이 익명으로 모여요. 적은 답은 앞의 큰 화면에 그대로 보여요.</p>';
+    const vals = function(){ const out = [], seen = {}; box.querySelectorAll('.ja').forEach(function(i){ const v = cleanAns(i.value), k = normAns(v); if (v && !seen[k]) { seen[k] = 1; out.push(v); } }); return out; };
+    const sync = function(){ $('js').disabled = !vals().length; };
+    const go = function(){
+      const a = vals(); if (!a.length) return;
+      $('js').disabled = true; $('jm').innerHTML = '<p class="hint">보내는 중…</p>';
+      rest('polls/' + code + '/votes/' + vid, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ a: a, at: { '.sv': 'timestamp' } }) })
+        .then(function(){ prev = { a: a }; ls.set(doneKey, JSON.stringify(prev)); done(); })
+        .catch(function(e){
+          $('js').disabled = false;
+          rest('polls/' + code + '/meta').then(function(m){ if (m && m.open === false) { meta = m; closed(); } else $('jm').innerHTML = '<p class="msg bad">보내지 못했어요. 잠시 뒤 다시 눌러 주세요. (' + esc(e.message) + ')</p>'; })
+            .catch(function(){ $('jm').innerHTML = '<p class="msg bad">보내지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.</p>'; });
+        });
+    };
+    box.querySelectorAll('.ja').forEach(function(i){ i.addEventListener('input', sync); i.addEventListener('keydown', function(e){ if (e.key === 'Enter' && vals().length) go(); }); });
+    $('js').addEventListener('click', go); sync();
+  }
   function form(){
+    if (isText(meta)) return formText();
     const opts = optsOf(meta);
     box.innerHTML = '<p class="hint">' + (prev ? '이미 낸 답을 바꿀 수 있어요' : '하나를 골라 주세요') + '</p><p class="q">' + esc(meta.q) + '</p>' +
       opts.map(function(o, i){ return '<button type="button" class="opt' + (i === pick ? ' on' : '') + '" data-i="' + i + '" aria-pressed="' + (i === pick) + '"><span class="dot"></span><span>' + esc(o) + '</span></button>'; }).join('') +
@@ -236,14 +363,14 @@ function pageJoin(code){
     const r = $('jr'); if (!r) return;
     r.innerHTML = '<p class="hint">결과를 불러오는 중…</p>';
     rest('polls/' + code + '/votes').then(function(v){
-      const t = tally(meta, v);
-      r.innerHTML = '<p class="hint" style="margin:0 0 10px">지금까지 <b>' + n(t.total) + '명</b></p>' + barsHtml(t) + '<button type="button" class="btn sm" id="jre">결과 새로 보기</button>';
+      const t = isText(meta) ? tallyText(meta, v) : tally(meta, v);
+      r.innerHTML = '<p class="hint" style="margin:0 0 10px">지금까지 <b>' + n(t.total) + '명</b></p>' + (isText(meta) ? cloudHtml(t) : barsHtml(t)) + '<button type="button" class="btn sm" id="jre">결과 새로 보기</button>';
       $('jre').addEventListener('click', resultBox);
     }).catch(function(){ r.innerHTML = '<p class="hint">결과를 불러오지 못했어요.</p>'; });
   }
   function done(){
     const opts = optsOf(meta);
-    box.innerHTML = '<h1>고마워요!</h1><p class="hint" style="margin:0 0 14px">고른 답: <b style="color:var(--ink)">' + esc(opts[prev.c] || '') + '</b></p>' +
+    box.innerHTML = '<h1>고마워요!</h1><p class="hint" style="margin:0 0 14px">' + (isText(meta) ? '낸 답' : '고른 답') + ': <b style="color:var(--ink)">' + esc(isText(meta) ? (prev.a || []).join(', ') : (opts[prev.c] || '')) + '</b></p>' +
       (meta.res ? '<div id="jr"></div>' : '<p class="msg">결과는 앞의 큰 화면에서 볼 수 있어요.</p>') +
       '<div class="row" style="margin-top:16px">' + (meta.open !== false ? '<button type="button" class="btn sm" id="jch">답 바꾸기</button>' : '') +
       (meta.link && /^https:\/\//.test(meta.link) ? '<a class="btn main sm" href="' + esc(meta.link) + '" target="_blank" rel="noopener">' + esc(meta.linkLabel || '더 보기') + '</a>' : '') + '</div>';
@@ -266,11 +393,11 @@ function pageJoin(code){
 function pageBoard(code){
   document.body.classList.add('board'); document.title = '헤아림 · 결과';
   app.innerHTML = '<div class="b-top">' + logo + '<div class="b-ctl" id="bc"></div></div><div class="b-main"><div class="b-join" id="bj"></div><div id="bm"><p class="b-count">연결하는 중…</p></div></div><button type="button" class="btn sm b-exit" id="bx">발표 모드 끝내기</button>';
-  $('bj').innerHTML = qrSvg(joinUrl(code)) + '<p class="how">QR을 찍고 골라 주세요</p><p class="url">' + esc(joinUrl(code).replace(/^https?:\/\//, '')) + '</p><p class="hint" style="margin:.6vh 0 0">설문 번호</p><p class="code" style="margin:0">' + esc(code) + '</p>';
+  $('bj').innerHTML = qrSvg(joinUrl(code)) + '<p class="how" id="bhow">QR을 찍고 골라 주세요</p><p class="url">' + esc(joinUrl(code).replace(/^https?:\/\//, '')) + '</p><p class="hint" style="margin:.6vh 0 0">설문 번호</p><p class="code" style="margin:0">' + esc(code) + '</p>';
   let meta = null, votes = null, uid = '', showCm = ls.get('ha_cm_' + code) !== '0', db = null;
   // 발표 모드: 켜고 끌 때 주소도 같이 바꿔서, 그 주소를 그대로 발표 자료에 넣을 수 있게
   const setShow = function(v){
-    document.body.classList.toggle('show', v);
+    document.body.classList.toggle('show', v); window.dispatchEvent(new Event('resize'));
     try { const u = new URL(location.href); if (v) u.searchParams.set('show', '1'); else u.searchParams.delete('show'); history.replaceState(null, '', u.toString()); } catch (e) {}
   };
   setShow(Q.get('show') === '1');
@@ -279,6 +406,7 @@ function pageBoard(code){
   function draw(){
     const m = $('bm'); if (!m) return;
     if (!meta) { m.innerHTML = '<p class="b-q">설문을 찾지 못했어요</p><p class="b-count">번호를 다시 확인해 주세요.</p>'; return; }
+    if (isText(meta)) return drawText();
     const t = tally(meta, votes), owner = uid && meta.owner === uid;
     m.innerHTML = '<p class="b-q">' + esc(meta.q) + (meta.open === false ? '<span class="b-closed">마감</span>' : '') + '</p><p class="b-count"><b>' + n(t.total) + '</b> 명이 답했어요</p>' + barsHtml(t) +
       (meta.ask && showCm && t.cmts.length ? '<div class="b-cmts">' + t.cmts.slice(0, 12).map(function(c){ return '<div class="cmt">' + esc(c.t) + '<small>' + esc(t.opts[c.c] || '') + '</small></div>'; }).join('') + '</div>' : '');
@@ -291,6 +419,24 @@ function pageBoard(code){
     if ($('bop')) $('bop').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(meta.open === false); });
     if ($('bcl')) armed($('bcl'), '한 번 더 누르면 지워요', function(){ db.ref('polls/' + code + '/votes').remove(); });
   }
+  // 적어서 내기: 답 구름. 주인은 글자를 눌러 숨길 수 있음
+  function drawText(){
+    const m = $('bm'), t = tallyText(meta, votes), owner = !!(uid && meta.owner === uid), hn = hideOf(meta).length;
+    if (!$('bw')) m.innerHTML = '<p class="b-q" id="bq"></p><p class="b-count" id="bn"></p><div class="cloud" id="bw"></div>';
+    $('bq').innerHTML = esc(meta.q) + (meta.open === false ? '<span class="b-closed">마감</span>' : '');
+    $('bn').innerHTML = '<b>' + n(t.total) + '</b> 명이 적었어요' + (t.items.length ? ' · 서로 다른 답 ' + n(t.items.length) + '개' : '');
+    $('bhow').textContent = 'QR을 찍고 적어 주세요';
+    $('bw').classList.toggle('own', owner);
+    cloudUpdate($('bw'), t, function(key){ if (!(uid && meta && meta.owner === uid)) return; db.ref('polls/' + code + '/meta/hide').set(hideOf(meta).concat([key]).slice(-99)); });
+    $('bc').innerHTML = (owner ? (hn ? '<button type="button" class="btn sm" id="bun">숨긴 답 ' + hn + '개 되살리기</button>' : '') + '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? '다시 받기' : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' : '') +
+      '<button type="button" class="btn sm" id="bsh">발표 모드</button><button type="button" class="btn sm" id="bfs">전체 화면</button>';
+    $('bsh').addEventListener('click', function(){ setShow(true); });
+    $('bfs').addEventListener('click', function(){ const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function(){}); });
+    if ($('bun')) $('bun').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/hide').remove(); });
+    if ($('bop')) $('bop').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(meta.open === false); });
+    if ($('bcl')) armed($('bcl'), '한 번 더 누르면 지워요', function(){ db.ref('polls/' + code + '/votes').remove(); });
+  }
+  let rz = 0; window.addEventListener('resize', function(){ clearTimeout(rz); rz = setTimeout(function(){ if (meta && isText(meta)) drawText(); }, 200); });
   loadFb().then(function(fb){
     db = fb.database();
     fb.auth().onAuthStateChanged(function(u){ uid = u ? u.uid : ''; if (meta) draw(); });
@@ -335,8 +481,10 @@ function pageHome(){
   function maker(){
     mk.innerHTML = '<div class="row" style="justify-content:space-between; margin-bottom:6px"><h2 style="margin:0" id="mh">설문 만들기</h2><button type="button" class="btn sm" id="lo">로그아웃</button></div><div id="me"></div>' +
       '<label class="f" for="mq">질문</label><textarea id="mq" rows="2" maxlength="200" placeholder="예: 체육 시간에 가장 하고 싶은 것은?"></textarea>' +
-      '<label class="f">보기 <span class="hint" style="font-weight:400">(2~6개)</span></label><div id="mo"></div><button type="button" class="btn sm" id="ma">보기 더하기</button>' +
-      '<label class="chk"><input type="checkbox" id="mask" checked><span>한 줄 의견도 받기</span></label>' +
+      '<label class="f" id="mtl">답하는 방식</label><div class="row" role="radiogroup" aria-labelledby="mtl" style="gap:4px 18px"><label class="chk" style="margin:0"><input type="radio" name="mt" id="mt0" checked><span>하나 고르기</span></label><label class="chk" style="margin:0"><input type="radio" name="mt" id="mt1"><span>적어서 내기 <span class="hint">(같은 답이 모이면 글씨가 커져요)</span></span></label></div>' +
+      '<div id="mpk"><label class="f">보기 <span class="hint" style="font-weight:400">(2~6개)</span></label><div id="mo"></div><button type="button" class="btn sm" id="ma">보기 더하기</button>' +
+      '<label class="chk"><input type="checkbox" id="mask" checked><span>한 줄 의견도 받기</span></label></div>' +
+      '<div id="mtx" hidden><label class="f" for="mmx">한 사람이 낼 수 있는 답</label><select id="mmx"><option value="1">1개</option><option value="2">2개까지</option><option value="3">3개까지</option><option value="4">4개까지</option><option value="5">5개까지</option></select><p class="hint" style="margin:8px 0 0">답은 20자까지 받고, 글자와 숫자만 남겨요(기호는 빠져요). 적은 답은 결과 화면에 그대로 뜨고, 만든 사람은 글자를 눌러 숨길 수 있어요.</p></div>' +
       '<label class="chk"><input type="checkbox" id="mres" checked><span>답을 낸 사람에게 결과 보여 주기</span></label>' +
       '<label class="f" for="ml">끝나고 보여 줄 주소 <span class="hint" style="font-weight:400">(안 써도 돼요)</span></label><input type="text" id="ml" inputmode="url" autocapitalize="none" placeholder="https://"><input type="text" id="mll" maxlength="30" placeholder="단추에 쓸 말 (예: 자료 보러 가기)" style="margin-top:8px">' +
       '<div id="mm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="mc">설문 만들기</button><button type="button" class="btn" id="mx" hidden>그만두기</button></div>';
@@ -345,14 +493,18 @@ function pageHome(){
     const addOpt = function(v, lock){ if (mo.children.length >= 6) return; const d = document.createElement('div'); d.className = 'row'; d.style.marginBottom = '8px'; d.innerHTML = '<input type="text" maxlength="60" placeholder="보기 ' + (mo.children.length + 1) + '" style="flex:1; min-width:0"><button type="button" class="btn sm" aria-label="이 보기 빼기">빼기</button>'; d.querySelector('input').value = v || ''; if (lock) { d.dataset.lock = '1'; d.querySelector('button').disabled = true; } d.querySelector('button').addEventListener('click', function(){ if (!d.dataset.lock && mo.children.length > 2) { d.remove(); renum(); } }); mo.appendChild(d); renum(); };
     const renum = function(){ Array.prototype.forEach.call(mo.children, function(d, i){ d.querySelector('input').placeholder = '보기 ' + (i + 1); }); $('ma').disabled = mo.children.length >= 6; };
     addOpt(); addOpt();
+    const tog = function(){ const t = $('mt1').checked; $('mpk').hidden = t; $('mtx').hidden = !t; };
+    $('mt0').addEventListener('change', tog); $('mt1').addEventListener('change', tog);
     // 만든 설문 고치기: 같은 칸에 내용을 채워 넣고 저장. 답이 이미 있으면 보기를 빼지 못하게(답이 보기 순서로 저장돼 있어서)
     form = {
-      reset: function(){ editing = null; $('mh').textContent = '설문 만들기'; $('me').innerHTML = ''; $('mq').value = ''; mo.innerHTML = ''; addOpt(); addOpt(); $('mask').checked = true; $('mres').checked = true; $('ml').value = ''; $('mll').value = ''; $('mc').textContent = '설문 만들기'; $('mx').hidden = true; },
+      reset: function(){ editing = null; $('mh').textContent = '설문 만들기'; $('me').innerHTML = ''; $('mq').value = ''; mo.innerHTML = ''; addOpt(); addOpt(); $('mt0').disabled = $('mt1').disabled = false; $('mt0').checked = true; tog(); $('mmx').value = '1'; $('mask').checked = true; $('mres').checked = true; $('ml').value = ''; $('mll').value = ''; $('mc').textContent = '설문 만들기'; $('mx').hidden = true; },
       fill: function(code, m, total){
+        const tx = isText(m); if (tx) total = 0;
         editing = { code: code, meta: m, lock: total > 0 ? optsOf(m).length : 0 };
+        $('mt' + (tx ? 1 : 0)).checked = true; $('mt0').disabled = $('mt1').disabled = true; tog(); $('mmx').value = String(maxOf(m));
         $('mh').textContent = '설문 고치기';
         $('me').innerHTML = '<p class="msg">번호 <span class="code">' + esc(code) + '</span> 설문을 고치는 중이에요.' + (total > 0 ? ' 이미 답이 ' + n(total) + '명 있어서 보기를 빼지는 못해요. 글자를 고치거나 더할 수는 있어요.' : '') + '</p>';
-        $('mq').value = m.q || ''; mo.innerHTML = ''; optsOf(m).forEach(function(o){ addOpt(o, total > 0); });
+        $('mq').value = m.q || ''; mo.innerHTML = ''; optsOf(m).forEach(function(o){ addOpt(o, total > 0); }); while (mo.children.length < 2) addOpt();
         $('mask').checked = !!m.ask; $('mres').checked = !!m.res; $('ml').value = m.link || ''; $('mll').value = m.linkLabel || '';
         $('mc').textContent = '고친 내용 저장'; $('mx').hidden = false; $('mm').innerHTML = '';
         if (mk.scrollIntoView) mk.scrollIntoView({ block: 'start' }); $('mq').focus();
@@ -366,15 +518,18 @@ function pageHome(){
   }
   function create(){
     const q = $('mq').value.trim(), opts = Array.prototype.map.call($('mo').querySelectorAll('input'), function(i){ return i.value.trim(); }).filter(Boolean);
+    const isT = $('mt1').checked;
     const link = $('ml').value.trim(), label = $('mll').value.trim(), bad = function(t){ $('mm').innerHTML = '<p class="msg bad">' + t + '</p>'; };
     if (!q) return bad('질문을 적어 주세요.');
-    if (opts.length < 2) return bad('보기를 2개 넘게 적어 주세요.');
+    if (!isT && opts.length < 2) return bad('보기를 2개 넘게 적어 주세요.');
     if (editing && editing.lock && Array.prototype.slice.call($('mo').querySelectorAll('input'), 0, editing.lock).some(function(i){ return !i.value.trim(); })) return bad('이미 답이 있는 보기는 비울 수 없어요.');
     if (link && !/^https:\/\/\S+$/.test(link)) return bad('주소는 https:// 로 시작해야 해요.');
     const meta = { owner: user.uid, q: q.slice(0, 200), opts: opts.map(function(o){ return o.slice(0, 60); }), open: true, ask: $('mask').checked, res: $('mres').checked, at: Date.now() };
+    if (isT) { delete meta.opts; meta.type = 'text'; meta.max = Math.min(5, Math.max(1, Number($('mmx').value) || 1)); meta.ask = false; }
     if (link) { meta.link = link.slice(0, 300); if (label) meta.linkLabel = label.slice(0, 30); }
     if (editing) {
       const code = editing.code, old = editing.meta, nm = { owner: old.owner, q: meta.q, opts: meta.opts, open: old.open !== false, ask: meta.ask, res: meta.res, at: old.at };
+      if (isT) { delete nm.opts; nm.type = 'text'; nm.max = meta.max; if (hideOf(old).length) nm.hide = hideOf(old); }
       if (meta.link) { nm.link = meta.link; if (meta.linkLabel) nm.linkLabel = meta.linkLabel; }
       $('mc').disabled = true; $('mm').innerHTML = '<p class="hint">저장하는 중…</p>';
       db.ref('polls/' + code + '/meta').set(nm).then(function(){ $('mc').disabled = false; form.reset(); $('mm').innerHTML = '<p class="msg">고쳤어요. 열려 있는 결과 화면에도 바로 바뀌어요.</p>'; list(code); })
@@ -399,8 +554,8 @@ function pageHome(){
       return Promise.all(codes.map(function(c){ return db.ref('polls/' + c).once('value').then(function(p){ return { code: c, v: p.val() }; }); })).then(function(rows){
         my.innerHTML = rows.map(function(r){
           if (!r.v || !r.v.meta) return '';
-          const m = r.v.meta, t = tally(m, r.v.votes);
-          return '<div class="poll" data-code="' + r.code + '"' + (r.code === fresh ? ' style="border-color:var(--brand)"' : '') + '><h3>' + esc(m.q) + '</h3><p class="hint" style="margin:0 0 10px"><span class="tag' + (m.open === false ? ' off' : '') + '">' + (m.open === false ? '마감' : '받는 중') + '</span> 번호 <span class="code">' + r.code + '</span> · 답 ' + n(t.total) + '명</p>' +
+          const m = r.v.meta, t = isText(m) ? tallyText(m, r.v.votes) : tally(m, r.v.votes);
+          return '<div class="poll" data-code="' + r.code + '"' + (r.code === fresh ? ' style="border-color:var(--brand)"' : '') + '><h3>' + esc(m.q) + '</h3><p class="hint" style="margin:0 0 10px"><span class="tag' + (m.open === false ? ' off' : '') + '">' + (m.open === false ? '마감' : '받는 중') + '</span> 번호 <span class="code">' + r.code + '</span> · 답 ' + n(t.total) + '명' + (isText(m) ? ' · 적어서 내기' : '') + '</p>' +
             '<div class="row"><a class="btn main sm" href="' + esc(boardUrl(r.code)) + '" target="_blank" rel="noopener">결과 화면 열기</a><button type="button" class="btn sm" data-act="copy">참여 주소 복사</button><button type="button" class="btn sm" data-act="edit">고치기</button><button type="button" class="btn sm" data-act="open">' + (m.open === false ? '다시 받기' : '마감하기') + '</button><button type="button" class="btn sm" data-act="csv">답 내려받기</button><button type="button" class="btn sm danger" data-act="del">지우기</button></div></div>';
         }).join('') || '<p class="empty">아직 만든 설문이 없어요.</p>';
         my.querySelectorAll('.poll').forEach(function(el){
@@ -419,6 +574,13 @@ function pageHome(){
   }
   function csv(code, meta, votes){
     const opts = optsOf(meta), q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    if (isText(meta)) {
+      const tr = Object.keys(votes || {}).map(function(k){ return votes[k]; }).filter(function(v){ return v && ansOf(v).length; }).sort(function(a, b){ return (a.at || 0) - (b.at || 0); })
+        .map(function(v){ return [new Date(v.at || 0).toLocaleString('ko-KR')].concat(ansOf(v)).map(q).join(','); });
+      const tt = '\uFEFF' + ['때', '적은 답'].map(q).join(',') + '\n' + tr.join('\n') + '\n';
+      const ta = document.createElement('a'); ta.href = URL.createObjectURL(new Blob([tt], { type: 'text/csv;charset=utf-8' })); ta.download = '헤아림_' + code + '.csv'; document.body.appendChild(ta); ta.click(); ta.remove();
+      return;
+    }
     const rows = Object.keys(votes || {}).map(function(k){ return votes[k]; }).filter(function(v){ return v && typeof v.c === 'number'; }).sort(function(a, b){ return (a.at || 0) - (b.at || 0); })
       .map(function(v){ return [new Date(v.at || 0).toLocaleString('ko-KR'), opts[v.c] || '', v.t || ''].map(q).join(','); });
     const text = '﻿' + ['때', '고른 보기', '한 줄 의견'].map(q).join(',') + '\n' + rows.join('\n') + '\n';
