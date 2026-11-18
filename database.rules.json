@@ -141,7 +141,7 @@
         ".write": "auth != null && root.child('polls').child($root).child('meta').child('owner').val() == auth.uid && !newData.exists()",
         "$n": {
           ".write": "$n.matches(/^[0-9]{1,2}$/) && (!data.exists() || (auth != null && root.child('polls').child($root).child('meta').child('owner').val() == auth.uid))",
-          ".validate": "newData.val() == true"
+          ".validate": "newData.isString() && newData.val().matches(/^[a-z0-9]{6}$/)"
         }
       }
     },

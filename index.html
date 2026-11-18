@@ -142,6 +142,9 @@
   .tab { font: inherit; font-weight: 800; padding: 10px 14px; border: 0; background: none; color: var(--ink-3); border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-height: 44px; }
   .tab.on { color: var(--brand-dark); border-bottom-color: var(--brand); }
   /* 퀴즈: 번호 고르기 · 번호별 표 */
+  .who { display: inline-block; margin: 0 0 12px; padding: 5px 14px; border-radius: 999px; background: var(--brand-dark); color: #fff; font-weight: 800; font-size: 16px; }
+  .b-seats { margin: -1vh 0 2vh; font-size: clamp(14px, 1.4vw, 24px); color: #C9D1DB; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+  .b-seats span { display: inline-block; min-width: 2em; text-align: center; padding: .1em .4em; border-radius: .5em; background: #22363F; color: #F4F2EE; font-weight: 800; font-variant-numeric: tabular-nums; }
   .seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 8px; margin-top: 12px; }
   .seat { font: inherit; font-weight: 800; font-size: 18px; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
   .seat.on { background: var(--brand); border-color: var(--brand); color: #fff; }
@@ -201,7 +204,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.8.0';
+const VERSION = '1.9.0';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -418,7 +421,8 @@ function pageJoin(code){
 
   // 묶음: 몇 번째 질문인지 · 다음 질문으로 가는 단추(스스로 넘어가기) · 기다리라는 안내(선생님과 함께)
   const nextOf = function(){ const sb = sibOf(meta), i = sb.indexOf(code); return i >= 0 && i < sb.length - 1 ? { code: sb[i + 1], no: i + 2, of: sb.length } : null; };
-  const step = function(){ const sb = sibOf(meta), i = sb.indexOf(code), a = []; if (sb.length > 1 && i >= 0) a.push('질문 ' + (i + 1) + ' / ' + sb.length); if (seat) a.push(seat.n + '번'); return a.length ? '<p class="hint" style="margin:0 0 4px; font-weight:700">' + a.join(' · ') + '</p>' : ''; };
+  const step = function(){ const sb = sibOf(meta), i = sb.indexOf(code), a = []; if (sb.length > 1 && i >= 0) a.push('질문 ' + (i + 1) + ' / ' + sb.length); return who() + (a.length ? '<p class="hint" style="margin:0 0 4px; font-weight:700">' + a.join(' · ') + '</p>' : ''); };
+  const who = function(){ return seat ? '<p class="who">' + seat.n + '번으로 들어왔어요</p>' : ''; };
   // 퀴즈: 번호를 고르고 들어옴. 고른 번호는 먼저 고른 사람 것(규칙이 막음). 이 기기에 번호를 기억해 두고 묶음 내내 같은 값으로 답함
   let seat = null;
   function enter(next){
@@ -427,7 +431,7 @@ function pageJoin(code){
     const ok = function(){ vid = seat.pid; next(); };
     rest('seats/' + root).then(function(taken){
       taken = taken || {};
-      if (seat && /^[a-z0-9]{16}$/.test(seat.pid || '') && taken[seat.n]) return ok();
+      if (seat && /^[a-z0-9]{16}$/.test(seat.pid || '') && seat.tk && taken[seat.n] === seat.tk) return ok();   // 선생님이 번호를 풀었거나 다른 기기가 차지했으면 다시 고름
       seat = null; picker(taken, root, sk, ok);
     }).catch(function(){ box.innerHTML = '<p class="msg bad">불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요.</p>'; });
   }
@@ -437,10 +441,10 @@ function pageJoin(code){
     box.innerHTML = '<p class="q">내 번호를 골라 주세요</p><p class="hint">이름은 받지 않아요. 흐린 번호는 이미 다른 친구가 골랐어요.</p><div class="seats">' + h + '</div><div id="jm">' + (note || '') + '</div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="jsn" style="flex:1" disabled>번호를 골라 주세요</button></div>';
     box.querySelectorAll('.seat').forEach(function(b){ b.addEventListener('click', function(){ num = Number(b.dataset.n); box.querySelectorAll('.seat').forEach(function(x){ x.classList.toggle('on', x === b); }); $('jsn').disabled = false; $('jsn').textContent = num + '번으로 들어가기'; }); });
     $('jsn').addEventListener('click', function(){
-      if (!num) return; const pid = rnd(16, 'abcdefghijklmnopqrstuvwxyz0123456789'), put = function(p, v){ return rest(p, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) }); };
+      if (!num) return; const pid = rnd(16, 'abcdefghijklmnopqrstuvwxyz0123456789'), tk = rnd(6, 'abcdefghijklmnopqrstuvwxyz0123456789'), put = function(p, v){ return rest(p, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) }); };
       $('jsn').disabled = true;
-      put('seats/' + root + '/' + num, true).then(function(){ return put('skeys/' + root + '/' + num, pid); }).then(function(){
-        seat = { pid: pid, n: num }; ls.set(sk, JSON.stringify(seat));
+      put('seats/' + root + '/' + num, tk).then(function(){ return put('skeys/' + root + '/' + num, pid); }).then(function(){
+        seat = { pid: pid, n: num, tk: tk }; ls.set(sk, JSON.stringify(seat));
         sibOf(meta).concat([code]).forEach(function(c){ ls.set('ha_done_' + c, ''); }); prev = null; ok();
       }).catch(function(){
         rest('seats/' + root).then(function(t2){ picker(t2 || {}, root, sk, ok, '<p class="msg bad">방금 다른 친구가 고른 번호예요. 다른 번호를 골라 주세요.</p>'); }).catch(function(){ $('jsn').disabled = false; });
@@ -556,7 +560,7 @@ function pageJoin(code){
   const mark = function(){ const rv = revOf(meta); if (isText(meta) || rv < 0) return ''; const mine = prev && typeof prev.c === 'number'; return '<p class="msg">' + (mine ? (prev.c === rv ? '<b>맞았어요!</b> ' : '아쉬워요. ') : '') + '정답은 <b>' + esc(optsOf(meta)[rv] || '') + '</b>이에요.</p>'; };
   function done(){
     const opts = optsOf(meta);
-    box.innerHTML = '<h1>고마워요!</h1><p class="hint" style="margin:0 0 14px">' + (isText(meta) ? '낸 답' : '고른 답') + ': <b style="color:var(--ink)">' + esc(isText(meta) ? (prev.a || []).join(', ') : (opts[prev.c] || '')) + '</b></p>' + mark() +
+    box.innerHTML = who() + '<h1>고마워요!</h1><p class="hint" style="margin:0 0 14px">' + (isText(meta) ? '낸 답' : '고른 답') + ': <b style="color:var(--ink)">' + esc(isText(meta) ? (prev.a || []).join(', ') : (opts[prev.c] || '')) + '</b></p>' + mark() +
       (qzOf(meta) === 'solo' ? '<div id="jq"></div>' : (meta.res ? '<div id="jr"></div>' : '<p class="msg">결과는 앞의 큰 화면에서 볼 수 있어요.</p>')) +
       '<div class="row" style="margin-top:16px">' + (meta.open !== false && revOf(meta) < 0 ? '<button type="button" class="btn sm" id="jch">답 바꾸기</button>' : '') +
       tail() + '</div>' + wait();
@@ -587,9 +591,16 @@ function pageBoard(code){
   app.innerHTML = '<div class="b-top">' + logo + '<div class="b-ctl" id="bc"></div></div><div class="b-main"><div class="b-join" id="bj"></div><div id="bm"><p class="b-count">연결하는 중…</p></div></div><button type="button" class="btn sm b-exit" id="bx">발표 모드 끝내기</button>';
   const setJoin = function(){ $('bj').innerHTML = qrSvg(joinUrl(code)) + '<p class="how" id="bhow">QR을 찍고 골라 주세요</p><p class="url">' + esc(joinUrl(code).replace(/^https?:\/\//, '')) + '</p><p class="hint" style="margin:.6vh 0 0">설문 번호</p><p class="code" style="margin:0">' + esc(code) + '</p><div class="b-nav" id="bnv"></div>'; };
   setJoin();
-  let meta = null, votes = null, uid = '', showCm = ls.get('ha_cm_' + code) !== '0', db = null, mref = null, vref = null, autoOpen = false, key = null, kref = null, qview = '', dist = null, dref = null, tdata = null;
+  let meta = null, votes = null, uid = '', showCm = ls.get('ha_cm_' + code) !== '0', db = null, mref = null, vref = null, autoOpen = false, key = null, kref = null, qview = '', dist = null, dref = null, tdata = null, seatsNow = null, sref = null;
+  const seatNums = function(){ const v = seatsNow || {}; return Object.keys(v).filter(function(k){ return v[k]; }).map(Number).sort(function(a, b){ return a - b; }); };
+  // 번호 하나만 풀기: 그 번호의 번호표·열쇠·답·점수를 지움 → 그 번호를 다시 고를 수 있음. 다른 번호는 그대로
+  const release = function(x){
+    const sb = sibOf(meta).length ? sibOf(meta) : [code], root = sb[0];
+    return Promise.all(sb.map(function(c){ return db.ref('polls/' + c + '/votes/' + x.pid).remove(); }).concat([db.ref('scores/' + root + '/' + x.pid).remove(), db.ref('skeys/' + root + '/' + x.n).remove(), db.ref('seats/' + root + '/' + x.n).remove()]))
+      .then(function(){ return grade(); }).then(function(g){ tdata = g; if (qview === 'table') draw(); });
+  };
   // 퀴즈(번호 입장): 분포는 누구나, 번호별 표와 채점은 만든 사람만
-  const watchQuiz = function(){ if (dref || !db || !meta || !qzOf(meta)) return; dref = db.ref('scores/' + rootOf(meta, code) + '/dist'); dref.on('value', function(s){ dist = s.val(); draw(); }); };
+  const watchQuiz = function(){ if (dref || !db || !meta || !qzOf(meta)) return; dref = db.ref('scores/' + rootOf(meta, code) + '/dist'); dref.on('value', function(s){ dist = s.val(); draw(); }); sref = db.ref('seats/' + rootOf(meta, code)); sref.on('value', function(s){ seatsNow = s.val(); draw(); }); };
   // 채점: 번호표(skeys)·답·정답을 모아 번호마다 맞은 개수를 셈. 정답이 있는 고르기 문제만 셈
   const grade = function(){
     const sb = sibOf(meta).length ? sibOf(meta) : [code], root = sb[0];
@@ -635,8 +646,9 @@ function pageBoard(code){
   // 번호별 표: 만든 사람만, 발표 모드에서는 안 나옴
   const drawTable = function(){
     const g = tdata;
-    $('bm').innerHTML = '<p class="b-q">번호별 결과</p><p class="b-count">이 표는 선생님만 볼 수 있어요. 큰 화면에 띄워져 있지 않은지 확인해 주세요.</p>' + (g ? '<div class="qt-wrap"><table class="qt"><tr><th>번호</th><th>맞은 개수</th>' + g.sb.map(function(_, i){ return g.graded[i] ? '<th>' + (i + 1) + '</th>' : ''; }).join('') + '</tr>' +
-      g.rows.map(function(x){ return '<tr><td>' + x.n + '번</td><td><b>' + x.c + '</b> / ' + g.total + '</td>' + x.marks.map(function(m2, i){ return g.graded[i] ? '<td>' + m2 + '</td>' : ''; }).join('') + '</tr>'; }).join('') + '</table></div>' + (g.rows.length ? '' : '<p class="b-count">아직 들어온 번호가 없어요.</p>') : '<p class="b-count">채점하는 중…</p>');
+    $('bm').innerHTML = '<p class="b-q">번호별 결과</p><p class="b-count">이 표는 선생님만 볼 수 있어요. 큰 화면에 띄워져 있지 않은지 확인해 주세요.</p>' + (g ? '<div class="qt-wrap"><table class="qt"><tr><th>번호</th><th>맞은 개수</th>' + g.sb.map(function(_, i){ return g.graded[i] ? '<th>' + (i + 1) + '</th>' : ''; }).join('') + '<th></th></tr>' +
+      g.rows.map(function(x){ return '<tr><td>' + x.n + '번</td><td><b>' + x.c + '</b> / ' + g.total + '</td>' + x.marks.map(function(m2, i){ return g.graded[i] ? '<td>' + m2 + '</td>' : ''; }).join('') + '<td><button type="button" class="btn sm" data-rel="' + x.n + '">번호 풀기</button></td></tr>'; }).join('') + '</table></div><p class="b-count" style="font-size:15px">번호 풀기: 번호를 잘못 고른 아이가 있을 때 그 번호만 비워요. 그 번호로 낸 답도 지워져요.</p>' + (g.rows.length ? '' : '<p class="b-count">아직 들어온 번호가 없어요.</p>') : '<p class="b-count">채점하는 중…</p>');
+    if (g) $('bm').querySelectorAll('[data-rel]').forEach(function(b){ const x = g.rows.filter(function(r){ return String(r.n) === b.dataset.rel; })[0]; if (x) armed(b, '한 번 더 누르면 풀어요', function(){ release(x); }); });
     altCtl();
   };
   // 정답은 만든 사람만 읽을 수 있음 — 만든 사람의 화면에서만 지켜봄
@@ -699,7 +711,7 @@ function pageBoard(code){
     if (qview === 'table' && uid && meta.owner === uid) return drawTable();
     if (isText(meta)) return drawText();
     const t = tally(meta, votes), owner = uid && meta.owner === uid, rev = revOf(meta), hasKey = !!(key && typeof key.a === 'number'), qz = qzOf(meta);
-    m.innerHTML = '<p class="b-q">' + esc(meta.q) + (meta.open === false ? '<span class="b-closed">' + (meta.wait ? '아직 열기 전' : '마감') + '</span>' : '') + '</p><p class="b-count"><b>' + n(t.total) + '</b> 명이 답했어요' + (rev >= 0 && t.total ? ' · 정답률 <b>' + Math.round((t.counts[rev] || 0) / t.total * 100) + '%</b>' : '') + '</p>' + (chart === 'col' ? colsHtml(t, rev) : chart === 'pie' ? pieHtml(t, rev) : barsHtml(t, rev)) +
+    m.innerHTML = '<p class="b-q">' + esc(meta.q) + (meta.open === false ? '<span class="b-closed">' + (meta.wait ? '아직 열기 전' : '마감') + '</span>' : '') + '</p><p class="b-count"><b>' + n(t.total) + '</b> 명이 답했어요' + (rev >= 0 && t.total ? ' · 정답률 <b>' + Math.round((t.counts[rev] || 0) / t.total * 100) + '%</b>' : '') + '</p>' + (qz ? '<p class="b-seats">들어온 번호 ' + seatNums().length + '명 / ' + seatsOf(meta) + '명' + seatNums().map(function(k){ return '<span>' + k + '</span>'; }).join('') + '</p>' : '') + (qz === 'solo' && !dist ? '<p class="b-count">푸는 중이에요. 결과를 알려 준 뒤에 그래프가 보여요.</p>' : (chart === 'col' ? colsHtml(t, rev) : chart === 'pie' ? pieHtml(t, rev) : barsHtml(t, rev))) +
       (meta.ask && showCm && t.cmts.length ? '<div class="b-cmts">' + t.cmts.slice(0, 12).map(function(c){ return '<div class="cmt">' + esc(c.t) + '<small>' + esc(t.opts[c.c] || '') + '</small></div>'; }).join('') + '</div>' : '');
     $('bc').innerHTML = '<button type="button" class="btn sm" id="bgr">그래프: ' + GN[chart] + '</button>' + (meta.ask ? '<button type="button" class="btn sm' + (showCm ? ' on' : '') + '" id="bcm">한 줄 의견 ' + (showCm ? '보임' : '숨김') + '</button>' : '') +
       (dist && qz ? '<button type="button" class="btn sm" id="bds">분포 보기</button>' : '') +

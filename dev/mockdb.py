@@ -37,7 +37,7 @@ def allowed(path, val, auth):
         if len(path) == 2: return owner and val is None
         if len(path) != 3 or not re.match(r'^[0-9]{1,2}$', path[2]): return False
         if val is None: return owner
-        good = (val is True) if path[0] == 'seats' else (isinstance(val, str) and re.match(r'^[a-z0-9]{16}$', val) is not None)
+        good = isinstance(val, str) and re.match(r'^[a-z0-9]{6}$' if path[0] == 'seats' else r'^[a-z0-9]{16}$', val) is not None
         return good and (get(path) is None or owner)
     if path[:1] != ['polls'] or len(path) < 3 or not re.match(r'^[a-z0-9]{6}$', path[1]): return False
     meta = get(['polls', path[1], 'meta'])

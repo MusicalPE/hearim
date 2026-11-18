@@ -275,14 +275,14 @@ try:
         return pg, info
     s1,i1=student(3,0,2); s2,i2=student(1,1,2); s3,i3=student(5,0,None)
     r401=0
-    try: dbput('seats/%s/3'%Q1,True)
+    try: dbput('seats/%s/3'%Q1,'abc123')
     except Exception as e: r401=getattr(e,'code',0)
     seats=dbget('seats/%s'%Q1); skeys=getc('skeys/'+Q1,'teacher1')
-    check('번호 고르기: 번호 5개 · 먼저 고른 번호는 다른 친구가 못 고름 · 화면에 내 번호', i1['seats']==5 and i1['dis']==0 and i2['dis']==1 and i3['dis']==2 and '3번' in i1['form'] and '질문 1 / 2' in i1['form'] and r401==401 and sorted(seats.keys() if isinstance(seats,dict) else [])==['1','3','5'], '%s %s'%(i2,seats))
+    check('번호 고르기: 번호 5개 · 먼저 고른 번호는 다른 친구가 못 고름 · 화면에 내 번호', i1['seats']==5 and i1['dis']==0 and i2['dis']==1 and i3['dis']==2 and '3번으로 들어왔어요' in i1['form'] and '3번으로 들어왔어요' in i1['done1'] and '질문 1 / 2' in i1['form'] and r401==401 and sorted(seats.keys() if isinstance(seats,dict) else [])==['1','3','5'], '%s %s'%(i2,seats))
     check('번호 열쇠는 만든 사람만 읽음 · 풀 때는 결과가 안 보이고 다음 질문으로 · 다 풀면 기다리라는 안내', getc('skeys/'+Q1)==401 and getc('skeys/'+Q1,'teacher2')==401 and len(skeys)==3 and i1['jr']==0 and '다음 질문' in i1['done1'] and '다 풀었어요' in i1['done2'] and '맞았어요' not in i1['done2'] and len(dbget('polls/%s/votes'%Q1))==3 and len(dbget('polls/%s/votes'%Q2))==2)
     qb=T.new_page(); qb.on('pageerror',lambda e: errs.append(str(e))); qb.goto(APP+'?b='+Q1); qb.wait_for_timeout(1200)
     qa=b.new_context(viewport={'width':1200,'height':800}); setup(qa); qv=qa.new_page(); qv.goto(APP+'?b='+Q1); qv.wait_for_timeout(900)
-    e2=qb.locator('#bsc').count()==1 and qb.locator('#btb').count()==1 and qv.locator('#bsc').count()==0 and qv.locator('#btb').count()==0 and qv.locator('#bds').count()==0
+    e2=qb.locator('.bar').count()==0 and '푸는 중' in qb.inner_text('#bm') and '들어온 번호 3명 / 5명' in qb.inner_text('.b-seats').replace('\n',' ') and [x.inner_text() for x in qb.locator('.b-seats span').all()]==['1','3','5'] and qv.locator('.b-seats span').count()==3 and qb.locator('#bsc').count()==1 and qb.locator('#btb').count()==1 and qv.locator('#bsc').count()==0 and qv.locator('#btb').count()==0 and qv.locator('#bds').count()==0
     qb.click('#bsc'); qb.wait_for_timeout(1500)
     pid=lambda nn: skeys[str(nn)] if isinstance(skeys,dict) else skeys[nn]
     sc=[dbget('scores/%s/%s'%(Q1,pid(nn))) for nn in (3,1,5)]; dist=dbget('scores/%s/dist'%Q1)
@@ -303,8 +303,15 @@ try:
     qb.click('#bqv'); qb.wait_for_timeout(300); qb.click('#btb'); qb.wait_for_timeout(1200)
     tb=qb.inner_text('table.qt') if qb.locator('table.qt').count() else ''
     e4='3번' in tb and '선생님만' in qb.inner_text('#bm') and qb.locator('table.qt tr').count()==4
+    # 번호 하나만 풀기 (5번)
+    p5=pid(5); rb=qb.locator('[data-rel="5"]'); rb.click(); rb.click(); qb.wait_for_timeout(1500)
+    st=dbget('seats/%s'%Q1); e12=sorted(st.keys())==['1','3'] and len(getc('skeys/'+Q1,'teacher1'))==2 and dbget('polls/%s/votes/%s'%(Q1,p5)) is None and dbget('scores/%s/%s'%(Q1,p5)) is None and len(dbget('polls/%s/votes'%Q1))==2 and qb.locator('table.qt tr').count()==3 and dbget('scores/%s/%s'%(Q1,pid(3)))=={'c':2,'n':2}
+    N5=b.new_context(viewport={'width':390,'height':800}); setup(N5); n5=N5.new_page(); n5.goto(APP+'?p='+Q1); n5.wait_for_timeout(700); e13=n5.locator('.seat:disabled').count()==2; n5.locator('.seat[data-n="5"]').click(); n5.click('#jsn'); n5.wait_for_timeout(800)
+    s3.goto(APP+'?p='+Q1); s3.wait_for_timeout(900); e14=s3.locator('.seat').count()==5 and s3.locator('.seat:disabled').count()==3
+    s1.goto(APP+'?p='+Q1); s1.wait_for_timeout(900); e15=s1.locator('.seat').count()==0 and '3번으로 들어왔어요' in s1.inner_text('#jc')
+    check('번호 하나만 풀기: 그 번호의 번호표·답·점수만 지워짐 · 다른 아이는 그대로 · 풀린 번호는 다시 고를 수 있고, 예전 기기는 번호를 다시 고르게 됨', e12 and e13 and e14 and e15, '%s %s %s %s'%(e12,e13,e14,e15)); N5.close()
     qb.click('#bsh'); qb.wait_for_timeout(400); e5=qb.locator('table.qt').count()==0; qb.click('#bx'); qb.wait_for_timeout(300)
-    check('번호별 결과: 만든 사람만 · 발표 모드로 가면 표가 사라짐', e4 and e5, tb[:80])
+    check('번호별 결과: 만든 사람만 · 발표 모드로 가면 표가 사라짐', e4 and e5)
     s1.goto(APP+'?p='+Q1); s1.wait_for_timeout(800); e6=s1.locator('.seat').count()==0 and '고마워요' in s1.inner_text('#jc') and '3번' not in '' 
     armed_rs=qb.locator('#brs'); armed_rs.click(); armed_rs.click(); qb.wait_for_timeout(1500)
     s1.goto(APP+'?p='+Q1); s1.wait_for_timeout(800)
