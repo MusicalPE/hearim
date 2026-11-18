@@ -138,9 +138,12 @@
   body.board .bar .fill { background: #5FD0D2; }
   body.board .bar.lead .fill { background: #FFC857; }
   /* 만들기 칸 위의 갈래: 설문 만들기 · 퀴즈 만들기 */
-  .tabs { display: flex; gap: 4px; margin: 6px 0 4px; border-bottom: 1px solid var(--line); }
-  .tab { font: inherit; font-weight: 800; padding: 10px 14px; border: 0; background: none; color: var(--ink-3); border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-height: 44px; }
-  .tab.on { color: var(--brand-dark); border-bottom-color: var(--brand); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 6px; }
+  .tab { font: inherit; font-weight: 800; padding: 9px 18px; min-height: 44px; border: 1.5px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink-2); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+  .tab:hover { background: #E6F4F4; border-color: var(--brand); color: var(--brand-dark); }
+  .tab:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  .tab.on { background: var(--brand-dark); border-color: var(--brand-dark); color: #fff; }
+  .tab.on:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
   /* 퀴즈: 번호 고르기 · 번호별 표 */
   .who { display: inline-block; margin: 0 0 12px; padding: 5px 14px; border-radius: 999px; background: var(--brand-dark); color: #fff; font-weight: 800; font-size: 16px; }
   .b-seats { margin: -1vh 0 2vh; font-size: clamp(14px, 1.4vw, 24px); color: #C9D1DB; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
@@ -204,7 +207,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.9.0';
+const VERSION = '1.9.1';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
