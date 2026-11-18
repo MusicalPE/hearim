@@ -138,6 +138,10 @@
   body.board .bar .fill { background: #5FD0D2; }
   body.board .bar.lead .fill { background: #FFC857; }
   /* 만들기 칸 위의 갈래: 설문 만들기 · 퀴즈 만들기 */
+  .qb { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 16px; margin-top: 12px; background: #fff; }
+  .qb-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; min-height: 36px; }
+  .qb-n { font-weight: 800; color: var(--brand-dark); }
+  .qlist { margin: 0 0 12px; padding-left: 22px; font-size: 15px; line-height: 1.6; color: var(--ink); }
   .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 6px; }
   .tab { font: inherit; font-weight: 800; padding: 9px 18px; min-height: 44px; border: 1.5px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink-2); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
   .tab:hover { background: #E6F4F4; border-color: var(--brand); color: var(--brand-dark); }
@@ -207,7 +211,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.9.2';
+const VERSION = '2.0.0';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -786,7 +790,7 @@ function pageHome(){
     '<p class="hint" style="text-align:center">헤아림 HearI&#39;m ' + VERSION + ' · 만든 사람 음악적체육인</p>';
   const go = function(){ const c = $('hc').value.trim().toLowerCase(); if (!CODE_RE.test(c)) { $('hm').innerHTML = '<p class="msg bad">번호는 영어 소문자와 숫자 6자리예요.</p>'; return; } location.href = joinUrl(c); };
   $('hg').addEventListener('click', go); $('hc').addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
-  const mk = $('mk'); let fb = null, db = null, user = null, editing = null, appending = null, form = null, myCount = 0;
+  const mk = $('mk'); let fb = null, db = null, user = null, form = null, myCount = 0;
   loadFb().then(function(f){
     fb = f; db = f.database();
     f.auth().onAuthStateChanged(function(u){ user = u; if (u) maker(); else login(); });
@@ -799,183 +803,223 @@ function pageHome(){
       fb.auth().signInWithPopup(new fb.auth.GoogleAuthProvider()).catch(function(e){ $('lm').innerHTML = '<p class="msg bad">로그인하지 못했어요. (' + esc(e && e.message || e) + ')</p>'; });
     });
   }
+  // ===== 만들기 칸: 질문을 한 칸 안에서 여러 개 이어 만듦 =====
+  // 저장은 질문마다 설문 하나(번호 하나)로 하고, 둘 이상이면 묶음(sib)으로 이어 결과 화면에서 쪽을 넘기며 봄
+  let kind = 'poll', eset = null, Qb = [], quid = 0;
+  function addQ(d){
+    d = d || {}; const id = ++quid, el = document.createElement('div'); el.className = 'qb';
+    const locked = d.votes > 0 && d.type !== 'text' ? (d.opts || []).length : 0;
+    el.innerHTML = '<div class="qb-h"><span class="qb-n"></span><button type="button" class="btn sm danger q-del">이 질문 지우기</button></div>' +
+      (d.code ? '<p class="hint qb-info" style="margin:0 0 8px">번호 <span class="code">' + esc(d.code) + '</span> · 답 ' + n(d.votes || 0) + '명' + (locked ? ' · 이미 답이 ' + n(d.votes) + '명 있어서 보기를 빼지는 못해요. 글자를 고치거나 더할 수는 있어요.' : '') + '</p>' : '') +
+      '<textarea class="q-q" data-k="mq" rows="2" maxlength="200" aria-label="질문"></textarea>' +
+      '<div class="q-tw" data-k="mtw"><label class="f">답하는 방식</label><div class="row" role="radiogroup" aria-label="답하는 방식" style="gap:4px 18px"><label class="chk" style="margin:0"><input type="radio" name="mt' + id + '" class="q-t0" data-k="mt0" checked><span>하나 고르기</span></label><label class="chk" style="margin:0"><input type="radio" name="mt' + id + '" class="q-t1" data-k="mt1"><span>적어서 내기 <span class="hint">(같은 답이 모이면 글씨가 커져요)</span></span></label></div></div>' +
+      '<div class="q-pk" data-k="mpk"><label class="f">보기 <span class="hint" style="font-weight:400">(2~6개)</span></label><div class="q-o" data-k="mo"></div><div class="row"><button type="button" class="btn sm q-add" data-k="ma">보기 더하기</button><button type="button" class="btn sm q-ox" data-k="mox">OX로 채우기</button></div>' +
+      '<div class="q-aw" data-k="manw"><label class="f">정답 <span class="hint" style="font-weight:400">(참여하는 사람에게는 보이지 않아요)</span></label><select class="q-ans" data-k="mans" aria-label="정답"><option value="">골라 주세요</option></select></div>' +
+      '<label class="chk q-askw" data-k="maskw"><input type="checkbox" class="q-ask" data-k="mask" checked><span>한 줄 의견도 받기</span></label></div>' +
+      '<div class="q-tx" data-k="mtx" hidden><label class="f">한 사람이 낼 수 있는 답</label><select class="q-max" data-k="mmx" aria-label="한 사람이 낼 수 있는 답"><option value="1">1개</option><option value="2">2개까지</option><option value="3">3개까지</option><option value="4">4개까지</option><option value="5">5개까지</option></select><p class="hint" style="margin:8px 0 0">답은 20자까지 받고, 글자와 숫자만 남겨요(기호는 빠져요). 적은 답은 결과 화면에 그대로 뜨고, 만든 사람은 글자를 눌러 숨길 수 있어요.</p><label class="chk"><input type="checkbox" class="q-mod" data-k="mmod"><span>확인한 뒤 띄우기 <span class="hint">(내가 띄운 답만 결과 화면에 나와요)</span></span></label></div>';
+    const $q = function(sel){ return el.querySelector(sel); }, mo = $q('.q-o');
+    const renum = function(){
+      Array.prototype.forEach.call(mo.children, function(r, i){ r.querySelector('input').placeholder = '보기 ' + (i + 1); }); $q('.q-add').disabled = mo.children.length >= 6;
+      const cur = $q('.q-ans').value; let h = '<option value="">골라 주세요</option>'; for (let i = 0; i < mo.children.length; i++) h += '<option value="' + i + '">보기 ' + (i + 1) + '</option>';
+      $q('.q-ans').innerHTML = h; $q('.q-ans').value = cur !== '' && Number(cur) < mo.children.length ? cur : '';
+    };
+    const addOpt = function(v, lock){
+      if (mo.children.length >= 6) return; const r = document.createElement('div'); r.className = 'row'; r.style.marginBottom = '8px';
+      r.innerHTML = '<input type="text" maxlength="60" style="flex:1; min-width:0" aria-label="보기"><button type="button" class="btn sm" aria-label="이 보기 빼기">빼기</button>';
+      r.querySelector('input').value = v || ''; if (lock) { r.dataset.lock = '1'; r.querySelector('button').disabled = true; }
+      r.querySelector('button').addEventListener('click', function(){ if (!r.dataset.lock && mo.children.length > 2) { r.remove(); $q('.q-ans').value = ''; renum(); } });
+      mo.appendChild(r); renum();
+    };
+    const tog = function(){ const t = $q('.q-t1').checked; $q('.q-pk').hidden = t; $q('.q-tx').hidden = !t; };
+    $q('.q-t0').addEventListener('change', tog); $q('.q-t1').addEventListener('change', tog);
+    $q('.q-add').addEventListener('click', function(){ addOpt(); });
+    $q('.q-ox').addEventListener('click', function(){ if (locked) return; mo.innerHTML = ''; $q('.q-ans').value = ''; addOpt('O'); addOpt('X'); });
+    $q('.q-q').value = d.q || ''; if (d.type === 'text') $q('.q-t1').checked = true;
+    (d.opts || []).forEach(function(o){ addOpt(o, locked > 0); }); while (mo.children.length < 2) addOpt();
+    $q('.q-ask').checked = d.ask !== false; $q('.q-max').value = String(d.max || 1); $q('.q-mod').checked = !!d.mod;
+    if (d.code) $q('.q-t0').disabled = $q('.q-t1').disabled = true;   // 만든 뒤에는 답하는 방식을 못 바꿈
+    tog();
+    const b = {
+      el: el, code: d.code || '', votes: d.votes || 0, lock: locked, base: d.base || null,
+      setAns: function(a){ if (a >= 0 && a < mo.children.length) $q('.q-ans').value = String(a); },
+      applyKind: function(){
+        const qk = kind === 'quiz';
+        $q('.q-tw').hidden = qk; $q('.q-ox').hidden = !qk; $q('.q-aw').hidden = !qk; $q('.q-askw').hidden = qk;
+        if (qk && $q('.q-t1').checked && !b.code) { $q('.q-t0').checked = true; tog(); }
+        if (!qk) $q('.q-ans').value = '';
+        $q('.q-q').placeholder = qk ? '예: 줄넘기는 유산소 운동이다' : '예: 체육 시간에 가장 하고 싶은 것은?';
+      },
+      get: function(){
+        const ins = Array.prototype.map.call(mo.querySelectorAll('input'), function(i){ return i.value.trim(); });
+        return { q: $q('.q-q').value.trim(), text: $q('.q-t1').checked, ins: ins, opts: ins.filter(Boolean), ar: $q('.q-ans').value, ask: $q('.q-ask').checked, max: Math.min(5, Math.max(1, Number($q('.q-max').value) || 1)), mod: $q('.q-mod').checked };
+      }
+    };
+    const kill = function(){ Qb.splice(Qb.indexOf(b), 1); el.remove(); update(); };
+    if (b.votes > 0) armed($q('.q-del'), '답 ' + n(b.votes) + '명도 함께 지워져요', kill); else $q('.q-del').addEventListener('click', kill);
+    $('qs').appendChild(el); Qb.push(b); return b;
+  }
+  // 질문 수·갈래에 맞춰 보이는 것을 정리. 첫 질문의 칸에는 예전과 같은 이름(id)을 붙여 둠
+  function update(){
+    const qk = kind === 'quiz', nq = Qb.length;
+    if (!qk) $('mqz').value = '';
+    const solo = qk && $('mqz').value === 'solo', ed = !!eset;
+    Qb.forEach(function(b, i){
+      b.el.querySelector('.qb-n').textContent = '질문 ' + (i + 1); b.el.querySelector('.q-del').hidden = nq < 2; b.applyKind();
+      b.el.querySelectorAll('[data-k]').forEach(function(x){ if (i === 0) x.id = x.dataset.k; else x.removeAttribute('id'); });
+    });
+    $('qadd').disabled = nq >= 10; $('qcnt').textContent = nq > 1 ? '질문 ' + nq + '개 · 결과 화면에서 쪽을 넘기며 봐요' : '';
+    $('tb0').classList.toggle('on', !qk); $('tb1').classList.toggle('on', qk); $('tb0').setAttribute('aria-selected', !qk); $('tb1').setAttribute('aria-selected', qk);
+    $('mqzw').hidden = !qk; $('mqs').hidden = !solo; $('mres').parentNode.hidden = solo; $('mfw').hidden = nq < 2 || solo;
+    $('mh').textContent = (qk ? '퀴즈 ' : '설문 ') + (ed ? '고치기' : '만들기'); $('mc').textContent = ed ? '고친 내용 저장' : (qk ? '퀴즈 만들기' : '설문 만들기'); $('mx').hidden = !ed;
+  }
   function maker(){
-    mk.innerHTML = '<div class="row" style="justify-content:space-between; margin-bottom:6px"><h2 style="margin:0" id="mh">설문 만들기</h2><button type="button" class="btn sm" id="lo">로그아웃</button></div><div class="tabs" role="tablist" aria-label="만들 것 고르기"><button type="button" role="tab" class="tab on" id="tb0" aria-selected="true">설문 만들기</button><button type="button" role="tab" class="tab" id="tb1" aria-selected="false">퀴즈 만들기</button></div><div id="me"></div>' +
-      '<label class="f" for="mq">질문</label><textarea id="mq" rows="2" maxlength="200" placeholder="예: 체육 시간에 가장 하고 싶은 것은?"></textarea>' +
-      '<div id="mtw"><label class="f" id="mtl">답하는 방식</label><div class="row" role="radiogroup" aria-labelledby="mtl" style="gap:4px 18px"><label class="chk" style="margin:0"><input type="radio" name="mt" id="mt0" checked><span>하나 고르기</span></label><label class="chk" style="margin:0"><input type="radio" name="mt" id="mt1"><span>적어서 내기 <span class="hint">(같은 답이 모이면 글씨가 커져요)</span></span></label></div></div>' +
-      '<div id="mpk"><label class="f">보기 <span class="hint" style="font-weight:400">(2~6개)</span></label><div id="mo"></div><div class="row"><button type="button" class="btn sm" id="ma">보기 더하기</button><button type="button" class="btn sm" id="mox">OX로 채우기</button></div>' +
-      '<div id="manw"><label class="f" for="mans">정답 <span class="hint" style="font-weight:400">(참여하는 사람에게는 보이지 않아요)</span></label><select id="mans"><option value="">골라 주세요</option></select></div>' +
-      '<label class="chk" id="maskw"><input type="checkbox" id="mask" checked><span>한 줄 의견도 받기</span></label></div>' +
-      '<div id="mtx" hidden><label class="f" for="mmx">한 사람이 낼 수 있는 답</label><select id="mmx"><option value="1">1개</option><option value="2">2개까지</option><option value="3">3개까지</option><option value="4">4개까지</option><option value="5">5개까지</option></select><p class="hint" style="margin:8px 0 0">답은 20자까지 받고, 글자와 숫자만 남겨요(기호는 빠져요). 적은 답은 결과 화면에 그대로 뜨고, 만든 사람은 글자를 눌러 숨길 수 있어요.</p><label class="chk"><input type="checkbox" id="mmod"><span>확인한 뒤 띄우기 <span class="hint">(내가 띄운 답만 결과 화면에 나와요)</span></span></label></div>' +
-      '<div id="mfw" hidden><label class="f" for="mfl">다음 질문으로 넘어가는 방식</label><select id="mfl"><option value="self">답을 내면 스스로 다음 질문으로</option><option value="with">선생님이 쪽을 넘기면 그 QR을 다시 찍기</option></select><p class="hint" style="margin:8px 0 0">선생님과 함께로 하면 뒤 질문은 닫혀 있다가, 결과 화면에서 그 쪽으로 넘길 때 열려요. 앞 질문은 계속 열려 있어요.</p></div>' +
+    mk.innerHTML = '<div class="row" style="justify-content:space-between; margin-bottom:6px"><h2 style="margin:0" id="mh">설문 만들기</h2><button type="button" class="btn sm" id="lo">로그아웃</button></div>' +
+      '<div class="tabs" role="tablist" aria-label="만들 것 고르기"><button type="button" role="tab" class="tab on" id="tb0" aria-selected="true">설문 만들기</button><button type="button" role="tab" class="tab" id="tb1" aria-selected="false">퀴즈 만들기</button></div><div id="me"></div><div id="qs"></div>' +
+      '<div class="row" style="margin-top:12px"><button type="button" class="btn sm" id="qadd">질문 더하기</button><span class="hint" id="qcnt"></span></div>' +
+      '<div id="mfw" hidden><label class="f" for="mfl">다음 질문으로 넘어가는 방식</label><select id="mfl" style="max-width:100%"><option value="self">답을 내면 스스로 다음 질문으로</option><option value="with">선생님이 쪽을 넘기면 그 QR을 다시 찍기</option></select><p class="hint" style="margin:8px 0 0">선생님과 함께로 하면 뒤 질문은 닫혀 있다가, 결과 화면에서 그 쪽으로 넘길 때 열려요. 앞 질문은 계속 열려 있어요.</p></div>' +
       '<div id="mqzw"><label class="f" for="mqz">푸는 방식</label><select id="mqz" style="max-width:100%"><option value="">함께 풀기 (번호 없이 · 선생님이 정답을 보여 줘요)</option><option value="solo">혼자 풀기 (번호로 들어와 끝까지 풀고, 맞은 개수를 각자 확인)</option></select></div>' +
-      '<div id="mqs" hidden><label class="f" for="msn">학생 수 <span class="hint" style="font-weight:400">(1~40)</span></label><input type="number" id="msn" min="1" max="40" value="30" inputmode="numeric" style="max-width:120px"><p class="hint" style="margin:8px 0 0">이름 대신 번호를 골라 들어와요. 질문에 학교·학년·반 이름은 적지 않는 것이 좋아요. 번호와 결과는 결과 화면의 퀴즈 처음부터로 지울 수 있어요. 문제마다 정답을 꼭 넣어 주세요.</p></div>' +
+      '<div id="mqs" hidden><label class="f" for="msn">학생 수 <span class="hint" style="font-weight:400">(1~40)</span></label><input type="number" id="msn" min="1" max="40" value="30" inputmode="numeric" style="max-width:120px"><p class="hint" style="margin:8px 0 0">이름 대신 번호를 골라 들어와요. 질문에 학교·학년·반 이름은 적지 않는 것이 좋아요. 번호와 결과는 결과 화면의 퀴즈 처음부터로 지울 수 있어요.</p></div>' +
       '<label class="chk"><input type="checkbox" id="mres" checked><span>답을 낸 사람에게 결과 보여 주기</span></label>' +
       '<label class="f" for="ml">끝나고 보여 줄 주소 <span class="hint" style="font-weight:400">(안 써도 돼요)</span></label><input type="text" id="ml" inputmode="url" autocapitalize="none" placeholder="https://"><input type="text" id="mll" maxlength="30" placeholder="단추에 쓸 말 (예: 자료 보러 가기)" style="margin-top:8px">' +
       '<div id="mm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="mc">설문 만들기</button><button type="button" class="btn" id="mx" hidden>그만두기</button></div>';
     $('myc').innerHTML = '<h2>내가 만든 설문</h2><div id="my"><p class="hint">불러오는 중…</p></div>'; $('myc').hidden = false;
-    const mo = $('mo');
-    const addOpt = function(v, lock){ if (mo.children.length >= 6) return; const d = document.createElement('div'); d.className = 'row'; d.style.marginBottom = '8px'; d.innerHTML = '<input type="text" maxlength="60" placeholder="보기 ' + (mo.children.length + 1) + '" style="flex:1; min-width:0"><button type="button" class="btn sm" aria-label="이 보기 빼기">빼기</button>'; d.querySelector('input').value = v || ''; if (lock) { d.dataset.lock = '1'; d.querySelector('button').disabled = true; } d.querySelector('button').addEventListener('click', function(){ if (!d.dataset.lock && mo.children.length > 2) { d.remove(); $('mans').value = ''; renum(); } }); mo.appendChild(d); renum(); };
-    const renum = function(){
-      Array.prototype.forEach.call(mo.children, function(d, i){ d.querySelector('input').placeholder = '보기 ' + (i + 1); }); $('ma').disabled = mo.children.length >= 6;
-      const cur = $('mans').value; let h = '<option value="">골라 주세요</option>'; for (let i = 0; i < mo.children.length; i++) h += '<option value="' + i + '">보기 ' + (i + 1) + '</option>';
-      $('mans').innerHTML = h; $('mans').value = cur !== '' && Number(cur) < mo.children.length ? cur : '';
-    };
-    addOpt(); addOpt();
-    const tog = function(){ const t = $('mt1').checked; $('mpk').hidden = t; $('mtx').hidden = !t; };
-    const qtog = function(){ $('mqs').hidden = !$('mqz').value; $('mres').parentNode.hidden = !!$('mqz').value; }; $('mqz').addEventListener('change', qtog);
-    // 설문 만들기 · 퀴즈 만들기: 같은 칸을 쓰되 갈래에 맞는 것만 보여 줌. 퀴즈는 하나 고르기에 정답을 꼭 넣음
-    let kind = 'poll';
-    const setKind = function(k){
-      kind = k === 'quiz' ? 'quiz' : 'poll'; const qk = kind === 'quiz';
-      $('tb0').classList.toggle('on', !qk); $('tb1').classList.toggle('on', qk); $('tb0').setAttribute('aria-selected', !qk); $('tb1').setAttribute('aria-selected', qk);
-      $('mtw').hidden = qk; $('mox').hidden = !qk; $('manw').hidden = !qk; $('mqzw').hidden = !qk; $('maskw').hidden = qk;
-      if (qk) { if ($('mt1').checked && !$('mt1').disabled) { $('mt0').checked = true; tog(); } $('mask').checked = false; }
-      else { $('mans').value = ''; $('mqz').value = ''; qtog(); }
-      $('mq').placeholder = qk ? '예: 줄넘기는 유산소 운동이다' : '예: 체육 시간에 가장 하고 싶은 것은?';
-      if (!editing && !appending) { $('mh').textContent = qk ? '퀴즈 만들기' : '설문 만들기'; $('mc').textContent = qk ? '퀴즈 만들기' : '설문 만들기'; }
-    };
-    $('tb0').addEventListener('click', function(){ setKind('poll'); }); $('tb1').addEventListener('click', function(){ setKind('quiz'); });
-    form = { kind: function(){ return kind; } };
-    $('mt0').addEventListener('change', tog); $('mt1').addEventListener('change', tog);
-    // 만든 설문 고치기: 같은 칸에 내용을 채워 넣고 저장. 답이 이미 있으면 보기를 빼지 못하게(답이 보기 순서로 저장돼 있어서)
-    Object.assign(form, {
-      reset: function(){ $('mqz').value = ''; $('msn').value = '30'; qtog(); appending = null; $('mfw').hidden = true; $('mfl').value = 'self'; $('mmod').checked = false; editing = null; $('mh').textContent = '설문 만들기'; $('me').innerHTML = ''; $('mq').value = ''; mo.innerHTML = ''; $('mans').value = ''; addOpt(); addOpt(); $('mt0').disabled = $('mt1').disabled = false; $('mt0').checked = true; tog(); $('mmx').value = '1'; $('mask').checked = true; $('mres').checked = true; $('ml').value = ''; $('mll').value = ''; $('mc').textContent = '설문 만들기'; $('mx').hidden = true; setKind(kind); },
-      fill: function(code, m, total){
-        form.reset(); setKind(qzOf(m) ? 'quiz' : 'poll');
-        const tx = isText(m); if (tx) total = 0;
-        editing = { code: code, meta: m, lock: total > 0 ? optsOf(m).length : 0 };
-        $('mt' + (tx ? 1 : 0)).checked = true; $('mt0').disabled = $('mt1').disabled = true; tog(); $('mmx').value = String(maxOf(m)); $('mmod').checked = !!m.mod;
-        if (sibOf(m).length > 1) { $('mfw').hidden = false; $('mfl').value = m.flow === 'with' ? 'with' : 'self'; }
-        $('mqz').value = qzOf(m) === 'solo' ? 'solo' : ''; $('msn').value = String(seatsOf(m)); qtog();
-        $('mh').textContent = '설문 고치기';
-        $('me').innerHTML = '<p class="msg">번호 <span class="code">' + esc(code) + '</span> 설문을 고치는 중이에요.' + (total > 0 ? ' 이미 답이 ' + n(total) + '명 있어서 보기를 빼지는 못해요. 글자를 고치거나 더할 수는 있어요.' : '') + '</p>';
-        $('mq').value = m.q || ''; mo.innerHTML = ''; optsOf(m).forEach(function(o){ addOpt(o, total > 0); }); while (mo.children.length < 2) addOpt();
-        $('mask').checked = !!m.ask; $('mres').checked = !!m.res; $('ml').value = m.link || ''; $('mll').value = m.linkLabel || '';
-        if (!tx) db.ref('keys/' + code).once('value').then(function(k){ const v = k.val(); if (editing && editing.code === code && v && typeof v.a === 'number' && v.a < mo.children.length) { setKind('quiz'); $('mans').value = String(v.a); $('mqz').value = qzOf(m) === 'solo' ? 'solo' : ''; qtog(); } }).catch(function(){});
-        $('mc').textContent = '고친 내용 저장'; $('mx').hidden = false; $('mm').innerHTML = '';
+    form = {
+      kind: function(){ return kind; },
+      reset: function(){
+        eset = null; Qb = []; $('qs').innerHTML = ''; $('me').innerHTML = '';
+        $('mfl').value = 'self'; $('mqz').value = ''; $('msn').value = '30'; $('mres').checked = true; $('ml').value = ''; $('mll').value = '';
+        addQ(); update();
+      },
+      // 만든 설문(묶음이면 질문 전체)을 같은 칸에 채워 넣고 고침
+      fill: function(codes, by){
+        form.reset(); Qb = []; $('qs').innerHTML = '';
+        const m0 = by[codes[0]].meta, es = { codes: codes.slice(), by: by }; eset = es; kind = qzOf(m0) ? 'quiz' : 'poll';
+        codes.forEach(function(c){ const v = by[c], m = v.meta, tx = isText(m); addQ({ code: c, q: m.q, type: tx ? 'text' : 'pick', opts: optsOf(m), ask: !!m.ask, max: maxOf(m), mod: !!m.mod, votes: (tx ? tallyText(m, v.votes) : tally(m, v.votes)).total, base: m }); });
+        $('mfl').value = m0.flow === 'with' ? 'with' : 'self'; $('mqz').value = qzOf(m0) === 'solo' ? 'solo' : ''; $('msn').value = String(seatsOf(m0)); $('mres').checked = !!m0.res; $('ml').value = m0.link || ''; $('mll').value = m0.linkLabel || '';
+        $('me').innerHTML = '<p class="msg">번호 <span class="code">' + esc(codes[0]) + '</span> ' + (codes.length > 1 ? '묶음(질문 ' + codes.length + '개)을' : '설문을') + ' 고치는 중이에요.</p>'; $('mm').innerHTML = '';
+        update();
+        // 정답은 만든 사람만 읽는 칸에 있음 — 불러와서 채우고, 하나라도 있으면 퀴즈 갈래로
+        Promise.all(codes.map(function(c){ return isText(by[c].meta) ? null : db.ref('keys/' + c).once('value').then(function(k){ return k.val(); }).catch(function(){ return null; }); })).then(function(ks){
+          if (eset !== es) return; const has = ks.some(function(v){ return v && typeof v.a === 'number'; });
+          if (has && kind !== 'quiz') { kind = 'quiz'; $('mqz').value = qzOf(m0) === 'solo' ? 'solo' : ''; update(); }
+          ks.forEach(function(v, i){ if (v && typeof v.a === 'number' && Qb[i] && Qb[i].code === codes[i]) Qb[i].setAns(v.a); });
+        });
         if (mk.scrollIntoView) mk.scrollIntoView({ block: 'start' }); $('mq').focus();
       }
-    });
-    setKind('poll');
-    // 질문 잇기: 있는 설문 뒤에 질문을 하나 더 붙여 묶음으로 만듦
-    form.append = function(code, m){
-      form.reset(); setKind(qzOf(m) ? 'quiz' : 'poll'); appending = { code: code, meta: m };
-      // 정답이 있는 질문 뒤에 잇는 것이면 퀴즈로
-      if (!qzOf(m) && !isText(m)) db.ref('keys/' + code).once('value').then(function(k){ const v = k.val(); if (appending && appending.code === code && v && typeof v.a === 'number') setKind('quiz'); }).catch(function(){});
-      const base = sibOf(m).length ? sibOf(m) : [code];
-      $('mh').textContent = '질문 잇기';
-      $('me').innerHTML = '<p class="msg">번호 <span class="code">' + esc(code) + '</span> 설문 뒤에 질문을 이어요. 지금 질문 ' + base.length + '개 · 결과 화면에서 쪽을 넘기며 볼 수 있어요.</p>';
-      $('mfw').hidden = false; $('mfl').value = m.flow === 'with' ? 'with' : 'self';
-      $('mqz').value = qzOf(m) === 'solo' ? 'solo' : ''; $('msn').value = String(seatsOf(m)); qtog();
-      $('mc').textContent = '이 질문 잇기'; $('mx').hidden = false; $('mm').innerHTML = '';
-      if (mk.scrollIntoView) mk.scrollIntoView({ block: 'start' }); $('mq').focus();
     };
+    $('tb0').addEventListener('click', function(){ kind = 'poll'; update(); }); $('tb1').addEventListener('click', function(){ kind = 'quiz'; update(); });
+    $('qadd').addEventListener('click', function(){ if (Qb.length >= 10) return; const b = addQ(); update(); b.el.querySelector('.q-q').focus(); });
+    $('mqz').addEventListener('change', update);
     $('mx').addEventListener('click', function(){ form.reset(); $('mm').innerHTML = ''; });
-    $('ma').addEventListener('click', function(){ addOpt(); });
-    $('mox').addEventListener('click', function(){ if (editing && editing.lock) return; mo.innerHTML = ''; $('mans').value = ''; addOpt('O'); addOpt('X'); });
     $('lo').addEventListener('click', function(){ fb.auth().signOut(); });
     $('mc').addEventListener('click', create);
-    list();
+    form.reset(); list();
   }
   // 선생님과 함께: 둘째 질문부터는 닫아 두고(대기) 결과 화면에서 그 쪽으로 넘길 때 열림. 이미 답이 있는 질문은 그대로 둠
   // 스스로: 대기 중이던 질문을 모두 엶
-  function applyFlow(sb, flow, qz, seatsN){
+  function applyFlow(sb, flow){
     return Promise.all(sb.map(function(c, i){ return db.ref('polls/' + c).once('value').then(function(p){
       const v = p.val(); if (!v || !v.meta) return null;
-      const w = [db.ref('polls/' + c + '/meta/flow').set(flow)], has = v.votes && Object.keys(v.votes).length;
-      // 퀴즈 방식은 묶음 전체가 같게
-      if (qz) { w.push(db.ref('polls/' + c + '/meta/qz').set(qz)); w.push(db.ref('polls/' + c + '/meta/seats').set(seatsN)); w.push(db.ref('polls/' + c + '/meta/res').set(false)); }
-      else if (v.meta.qz) { w.push(db.ref('polls/' + c + '/meta/qz').remove()); w.push(db.ref('polls/' + c + '/meta/seats').remove()); }
+      const w = [], has = v.votes && Object.keys(v.votes).length;
       if (flow === 'with' && i > 0 && !has && v.meta.open !== false) { w.push(db.ref('polls/' + c + '/meta/open').set(false)); w.push(db.ref('polls/' + c + '/meta/wait').set(true)); }
       if (flow !== 'with' && v.meta.wait) { w.push(db.ref('polls/' + c + '/meta/open').set(true)); w.push(db.ref('polls/' + c + '/meta/wait').remove()); }
       return Promise.all(w);
     }); }));
   }
+  const wipe = function(c){ return db.ref('keys/' + c).remove().catch(function(){}).then(function(){ return db.ref('polls/' + c + '/votes').remove(); }).then(function(){ return db.ref('polls/' + c + '/meta').remove(); }).then(function(){ return db.ref('users/' + user.uid + '/polls/' + c).remove(); }); };
   function create(){
-    const q = $('mq').value.trim(), opts = Array.prototype.map.call($('mo').querySelectorAll('input'), function(i){ return i.value.trim(); }).filter(Boolean);
-    const isT = $('mt1').checked;
-    const link = $('ml').value.trim(), label = $('mll').value.trim(), bad = function(t){ $('mm').innerHTML = '<p class="msg bad">' + t + '</p>'; };
-    if (!q) return bad('질문을 적어 주세요.');
-    if (!isT && opts.length < 2) return bad('보기를 2개 넘게 적어 주세요.');
-    if (editing && editing.lock && Array.prototype.slice.call($('mo').querySelectorAll('input'), 0, editing.lock).some(function(i){ return !i.value.trim(); })) return bad('이미 답이 있는 보기는 비울 수 없어요.');
-    if (link && !/^https:\/\/\S+$/.test(link)) return bad('주소는 https:// 로 시작해야 해요.');
-    // 정답: 고른 줄이 (빈 줄을 뺀) 보기 가운데 몇 번째인지로 저장
-    let ans = -1; const ar = $('mans').value;
-    if (!isT && ar !== '') { const ins = Array.prototype.map.call($('mo').querySelectorAll('input'), function(i){ return i.value.trim(); }); if (!ins[ar]) return bad('정답으로 고른 보기가 비어 있어요.'); ans = ins.slice(0, Number(ar)).filter(Boolean).length; }
-    if (form.kind() === 'quiz' && !isT && ans < 0) return bad('정답을 골라 주세요.');
-    const meta = { owner: user.uid, q: q.slice(0, 200), opts: opts.map(function(o){ return o.slice(0, 60); }), open: true, ask: $('mask').checked, res: $('mres').checked, at: Date.now() };
-    if (isT) { delete meta.opts; meta.type = 'text'; meta.max = Math.min(5, Math.max(1, Number($('mmx').value) || 1)); meta.ask = false; if ($('mmod').checked) meta.mod = true; }
-    const qz = $('mqz').value === 'solo' ? 'solo' : '', seatsN = Math.min(40, Math.max(1, Math.round(Number($('msn').value)) || 30));
-    const flow = qz === 'solo' ? 'self' : ($('mfl').value === 'with' ? 'with' : 'self');
-    if (qz) { meta.qz = qz; meta.seats = seatsN; meta.res = false; }
-    if (link) { meta.link = link.slice(0, 300); if (label) meta.linkLabel = label.slice(0, 30); }
-    if (editing) {
-      const code = editing.code, old = editing.meta, nm = { owner: old.owner, q: meta.q, opts: meta.opts, open: old.open !== false, ask: meta.ask, res: meta.res, at: old.at };
-      if (isT) { delete nm.opts; nm.type = 'text'; nm.max = meta.max; if (meta.mod) nm.mod = true; if (hideOf(old).length) nm.hide = hideOf(old); }
-      const osb = sibOf(old); if (osb.length > 1) { nm.sib = osb; nm.flow = flow; } if (old.wait) nm.wait = true;
-      if (qz) { nm.qz = qz; nm.seats = seatsN; nm.res = false; }
-      if (meta.link) { nm.link = meta.link; if (meta.linkLabel) nm.linkLabel = meta.linkLabel; }
-      $('mc').disabled = true; $('mm').innerHTML = '<p class="hint">저장하는 중…</p>';
-      db.ref('polls/' + code + '/meta').set(nm).then(function(){ return osb.length > 1 ? applyFlow(osb, flow, qz, seatsN) : null; }).then(function(){ return isT ? null : (ans >= 0 ? db.ref('keys/' + code).set({ a: ans }) : db.ref('keys/' + code).remove()); }).then(function(){ $('mc').disabled = false; form.reset(); $('mm').innerHTML = '<p class="msg">고쳤어요. 열려 있는 결과 화면에도 바로 바뀌어요.</p>'; list(code); })
-        .catch(function(e){ $('mc').disabled = false; bad('고치지 못했어요. (' + esc(e && e.message || e) + ')'); });
-      return;
+    const bad = function(t){ $('mm').innerHTML = '<p class="msg bad">' + t + '</p>'; }, qk = kind === 'quiz', nq = Qb.length, pre = function(i){ return nq > 1 ? '질문 ' + (i + 1) + ': ' : ''; }, items = [];
+    for (let i = 0; i < nq; i++) {
+      const b = Qb[i], g = b.get(), it = { b: b, q: g.q.slice(0, 200), text: g.text, ans: -1 };
+      if (!g.q) return bad(pre(i) + '질문을 적어 주세요.');
+      if (!g.text) {
+        if (g.opts.length < 2) return bad(pre(i) + '보기를 2개 넘게 적어 주세요.');
+        if (b.lock && g.ins.slice(0, b.lock).some(function(x){ return !x; })) return bad(pre(i) + '이미 답이 있는 보기는 비울 수 없어요.');
+        it.opts = g.opts.map(function(o){ return o.slice(0, 60); });
+        // 정답: 고른 줄이 (빈 줄을 뺀) 보기 가운데 몇 번째인지로 저장
+        if (qk) { if (g.ar !== '') { if (!g.ins[g.ar]) return bad(pre(i) + '정답으로 고른 보기가 비어 있어요.'); it.ans = g.ins.slice(0, Number(g.ar)).filter(Boolean).length; } else return bad(pre(i) + '정답을 골라 주세요.'); }
+        it.ask = !qk && g.ask;
+      } else { it.max = g.max; it.mod = g.mod; }
+      items.push(it);
     }
-    if (myCount >= MAX_POLLS) return bad('설문은 ' + MAX_POLLS + '개까지 만들어 둘 수 있어요. 다 쓴 설문을 지우고 다시 만들어 주세요.');
-    const ap = appending ? { base: sibOf(appending.meta).length ? sibOf(appending.meta) : [appending.code], flow: flow } : null;
-    if (ap && ap.base.length >= 10) return bad('한 묶음에 질문은 10개까지예요.');
-    $('mc').disabled = true; $('mm').innerHTML = '<p class="hint">만드는 중…</p>';
-    const attempt = function(left){
-      const code = rnd(6, ALPHA);
-      if (ap) { meta.sib = ap.base.concat([code]); meta.flow = ap.flow; }
-      // 이미 있는 번호면 규칙이 막음 → 다른 번호로 다시
-      return db.ref('polls/' + code + '/meta').set(meta).then(function(){ return db.ref('users/' + user.uid + '/polls/' + code).set(meta.at).then(function(){ return code; }); })
-        .catch(function(e){ if (left > 0) return attempt(left - 1); throw e; });
+    const link = $('ml').value.trim(), label = $('mll').value.trim();
+    if (link && !/^https:\/\/\S+$/.test(link)) return bad('주소는 https:// 로 시작해야 해요.');
+    const qz = qk && $('mqz').value === 'solo' ? 'solo' : '', seatsN = Math.min(40, Math.max(1, Math.round(Number($('msn').value)) || 30));
+    const flow = qz ? 'self' : (nq > 1 && $('mfl').value === 'with' ? 'with' : 'self'), res = qz ? false : $('mres').checked;
+    const fresh = items.filter(function(it){ return !it.b.code; }).length, ed = eset;
+    if (fresh && myCount + fresh > MAX_POLLS) return bad('설문은 ' + MAX_POLLS + '개까지 만들어 둘 수 있어요. 다 쓴 설문을 지우고 다시 만들어 주세요.');
+    const now = Date.now(), gone = ed ? ed.codes.filter(function(c){ return !items.some(function(it){ return it.b.code === c; }); }) : [], codes = [];
+    const build = function(it, i, sb){
+      const base = it.b.base, m = { owner: user.uid, q: it.q, open: base ? base.open !== false : true, ask: !!it.ask, res: res, at: base ? base.at : now + i };
+      if (it.text) { m.type = 'text'; m.max = it.max; if (it.mod) m.mod = true; if (base && hideOf(base).length) m.hide = hideOf(base); } else m.opts = it.opts;
+      if (base && base.wait) { if (sb && sb.length > 1) m.wait = true; else m.open = true; }
+      if (link) { m.link = link.slice(0, 300); if (label) m.linkLabel = label.slice(0, 30); }
+      if (sb && sb.length > 1) { m.sib = sb; m.flow = flow; }
+      if (qz) { m.qz = qz; m.seats = seatsN; }
+      return m;
     };
-    attempt(4).then(function(code){ return ans >= 0 ? db.ref('keys/' + code).set({ a: ans }).then(function(){ return code; }) : code; }).then(function(code){
-      // 잇기: 먼저 있던 질문들에도 새 순서와 넘어가는 방식을 적어 둠
-      if (!ap) return code;
-      return Promise.all(ap.base.map(function(c){ return Promise.all([db.ref('polls/' + c + '/meta/sib').set(meta.sib), db.ref('polls/' + c + '/meta/flow').set(ap.flow)]); })).then(function(){ return applyFlow(meta.sib, ap.flow, qz, seatsN); }).then(function(){ const cnt = meta.sib.length; form.reset(); $('mm').innerHTML = '<p class="msg">이었어요. 질문 ' + cnt + '개가 한 묶음이에요.</p>'; $('mc').disabled = false; list(code); throw { done: true }; });
-    }).then(function(code){ $('mm').innerHTML = '<p class="msg">만들었어요. 결과 화면을 열어 QR을 보여 주세요.</p>'; $('mc').disabled = false; $('mq').value = ''; Array.prototype.forEach.call($('mo').querySelectorAll('input'), function(i){ i.value = ''; }); list(code); })
-      .catch(function(e){ if (e && e.done) return; $('mc').disabled = false; bad('만들지 못했어요. (' + esc(e && e.message || e) + ')'); });
+    // 새 질문은 번호를 먼저 받음(이미 있는 번호면 규칙이 막으므로 다른 번호로 다시)
+    const mint = function(it, i, left){
+      const code = rnd(6, ALPHA);
+      return db.ref('polls/' + code + '/meta').set(build(it, i, null)).then(function(){ return db.ref('users/' + user.uid + '/polls/' + code).set(now + i); }).then(function(){ return code; })
+        .catch(function(e){ if (left > 0) return mint(it, i, left - 1); throw e; });
+    };
+    $('mc').disabled = true; $('mm').innerHTML = '<p class="hint">' + (ed ? '저장하는 중…' : '만드는 중…') + '</p>';
+    let chain = Promise.resolve();
+    items.forEach(function(it, i){ chain = chain.then(function(){ return it.b.code || mint(it, i, 4); }).then(function(c){ codes[i] = c; }); });
+    chain.then(function(){ return Promise.all(items.map(function(it, i){ return db.ref('polls/' + codes[i] + '/meta').set(build(it, i, codes)); })); })
+      .then(function(){ return Promise.all(items.map(function(it, i){ return it.text ? null : (it.ans >= 0 ? db.ref('keys/' + codes[i]).set({ a: it.ans }) : (it.b.code ? db.ref('keys/' + codes[i]).remove() : null)); })); })
+      .then(function(){ return Promise.all(gone.map(wipe)); })
+      .then(function(){ return codes.length > 1 ? applyFlow(codes, flow) : null; })
+      .then(function(){
+        $('mc').disabled = false; form.reset();
+        $('mm').innerHTML = '<p class="msg">' + (ed ? '고쳤어요. 열려 있는 결과 화면에도 바로 바뀌어요.' : '만들었어요.' + (codes.length > 1 ? ' 질문 ' + codes.length + '개가 한 묶음이에요.' : '') + ' 결과 화면을 열어 QR을 보여 주세요.') + '</p>';
+        list(codes[0]);
+      })
+      .catch(function(e){ $('mc').disabled = false; bad((ed ? '고치지 못했어요. (' : '만들지 못했어요. (') + esc(e && e.message || e) + ')'); });
   }
+  // 내가 만든 설문: 묶음은 카드 하나로 보여 줌
   function list(fresh){
     const my = $('my'); if (!my) return;
     db.ref('users/' + user.uid + '/polls').once('value').then(function(s){
       const codes = Object.keys(s.val() || {}).filter(function(c){ return CODE_RE.test(c); }).sort(function(a, b){ return (s.val()[b] || 0) - (s.val()[a] || 0); });
       if (!codes.length) { myCount = 0; my.innerHTML = '<p class="empty">아직 만든 설문이 없어요.</p>'; return; }
       return Promise.all(codes.map(function(c){ return db.ref('polls/' + c).once('value').then(function(p){ return { code: c, v: p.val() }; }); })).then(function(rows){
-        myCount = rows.filter(function(r){ return r.v && r.v.meta; }).length;
-        // 묶음은 질문 순서대로 붙여서 보여 줌
-        const gt = {}; rows.forEach(function(r){ if (!r.v || !r.v.meta) return; const sb = sibOf(r.v.meta); r.g = sb[0] || r.code; r.i = Math.max(0, sb.indexOf(r.code)); r.n = sb.length; gt[r.g] = Math.max(gt[r.g] || 0, r.v.meta.at || 0); });
-        rows.sort(function(a, b){ return (gt[b.g] || 0) - (gt[a.g] || 0) || (a.g < b.g ? -1 : a.g > b.g ? 1 : 0) || a.i - b.i; });
-        my.innerHTML = rows.map(function(r){
-          if (!r.v || !r.v.meta) return '';
-          const m = r.v.meta, t = isText(m) ? tallyText(m, r.v.votes) : tally(m, r.v.votes);
-          return '<div class="poll" data-code="' + r.code + '"' + (r.code === fresh ? ' style="border-color:var(--brand)"' : '') + '><h3>' + esc(m.q) + '</h3><p class="hint" style="margin:0 0 10px"><span class="tag' + (m.open === false ? ' off' : '') + '">' + (m.open === false ? (m.wait ? '대기' : '마감') : '받는 중') + '</span> 번호 <span class="code">' + r.code + '</span> · 답 ' + n(t.total) + '명' + (isText(m) ? ' · 적어서 내기' : '') + (qzOf(m) === 'solo' ? ' · 퀴즈(혼자 풀기)' : '') + (r.n > 1 ? ' · <b>묶음 ' + (r.i + 1) + '/' + r.n + '</b>' : '') + '</p>' +
-            '<div class="row"><a class="btn main sm" href="' + esc(boardUrl(r.code)) + '" target="_blank" rel="noopener">결과 화면 열기</a><button type="button" class="btn sm" data-act="copy">참여 주소 복사</button><button type="button" class="btn sm" data-act="edit">고치기</button>' + (r.n < 2 || r.i === r.n - 1 ? '<button type="button" class="btn sm" data-act="add">질문 잇기</button>' : '') + '<button type="button" class="btn sm" data-act="open">' + (m.open === false ? (m.wait ? '열기' : '다시 받기') : '마감하기') + '</button><button type="button" class="btn sm" data-act="csv">답 내려받기</button><button type="button" class="btn sm danger" data-act="del">지우기</button></div></div>';
+        const ok = rows.filter(function(r){ return r.v && r.v.meta; }), by = {}, seen = {}, groups = [];
+        myCount = ok.length; ok.forEach(function(r){ by[r.code] = r.v; });
+        ok.forEach(function(r){
+          if (seen[r.code]) return; let sb = sibOf(r.v.meta).filter(function(c){ return by[c]; }); if (sb.indexOf(r.code) < 0) sb = [r.code];
+          sb.forEach(function(c){ seen[c] = 1; }); groups.push({ codes: sb, at: Math.max.apply(null, sb.map(function(c){ return by[c].meta.at || 0; })) });
+        });
+        groups.sort(function(a, b){ return b.at - a.at; });
+        const tot = function(c){ const v = by[c]; return (isText(v.meta) ? tallyText(v.meta, v.votes) : tally(v.meta, v.votes)).total; };
+        my.innerHTML = groups.map(function(g, gi){
+          const c0 = g.codes[0], m = by[c0].meta, nq = g.codes.length, anyOpen = g.codes.some(function(c){ return by[c].meta.open !== false; }), most = Math.max.apply(null, g.codes.map(tot));
+          return '<div class="poll" data-code="' + c0 + '" data-g="' + gi + '"' + (g.codes.indexOf(fresh) >= 0 ? ' style="border-color:var(--brand)"' : '') + '><h3>' + esc(m.q) + (nq > 1 ? ' <span class="hint" style="font-weight:600">외 ' + (nq - 1) + '개</span>' : '') + '</h3><p class="hint" style="margin:0 0 10px"><span class="tag' + (anyOpen ? '' : ' off') + '">' + (anyOpen ? '받는 중' : '마감') + '</span> 번호 <span class="code">' + c0 + '</span> · 답 ' + n(most) + '명' + (nq === 1 && isText(m) ? ' · 적어서 내기' : '') + (qzOf(m) === 'solo' ? ' · 퀴즈(혼자 풀기)' : '') + (nq > 1 ? ' · <b>질문 ' + nq + '개</b>' : '') + '</p>' +
+            (nq > 1 ? '<ol class="qlist">' + g.codes.map(function(c){ const x = by[c].meta; return '<li>' + esc(x.q) + ' <span class="hint">· 답 ' + n(tot(c)) + '명' + (x.open === false ? (x.wait ? ' · 대기' : ' · 마감') : '') + '</span></li>'; }).join('') + '</ol>' : '') +
+            '<div class="row"><a class="btn main sm" href="' + esc(boardUrl(c0)) + '" target="_blank" rel="noopener">결과 화면 열기</a><button type="button" class="btn sm" data-act="copy">참여 주소 복사</button><button type="button" class="btn sm" data-act="edit">고치기</button><button type="button" class="btn sm" data-act="open">' + (anyOpen ? '마감하기' : '다시 받기') + '</button><button type="button" class="btn sm" data-act="csv">답 내려받기</button><button type="button" class="btn sm danger" data-act="del">지우기</button></div></div>';
         }).join('') || '<p class="empty">아직 만든 설문이 없어요.</p>';
         my.querySelectorAll('.poll').forEach(function(el){
-          const code = el.dataset.code, row = rows.filter(function(r){ return r.code === code; })[0], m = row.v.meta;
-          el.querySelector('[data-act=copy]').addEventListener('click', function(e){ const b = e.currentTarget, ok = function(){ b.textContent = '복사했어요'; setTimeout(function(){ b.textContent = '참여 주소 복사'; }, 1500); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(joinUrl(code)).then(ok, function(){ prompt('참여 주소', joinUrl(code)); }); else prompt('참여 주소', joinUrl(code)); });
-          el.querySelector('[data-act=edit]').addEventListener('click', function(){ form.fill(code, m, tally(m, row.v.votes).total); });
-          el.querySelector('[data-act=open]').addEventListener('click', function(){ db.ref('polls/' + code + '/meta/open').set(m.open === false).then(function(){ return m.open === false && m.wait ? db.ref('polls/' + code + '/meta/wait').remove() : null; }).then(function(){ list(); }); });
-          if (el.querySelector('[data-act=add]')) el.querySelector('[data-act=add]').addEventListener('click', function(){ form.append(code, m); });
+          const g = groups[Number(el.dataset.g)], code = g.codes[0], anyOpen = g.codes.some(function(c){ return by[c].meta.open !== false; });
+          el.querySelector('[data-act=copy]').addEventListener('click', function(e){ const b = e.currentTarget, ok2 = function(){ b.textContent = '복사했어요'; setTimeout(function(){ b.textContent = '참여 주소 복사'; }, 1500); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(joinUrl(code)).then(ok2, function(){ prompt('참여 주소', joinUrl(code)); }); else prompt('참여 주소', joinUrl(code)); });
+          el.querySelector('[data-act=edit]').addEventListener('click', function(){ form.fill(g.codes, by); });
+          // 마감: 열려 있는 질문을 모두 닫음. 다시 받기: 대기 중인 질문만 빼고 엶
+          el.querySelector('[data-act=open]').addEventListener('click', function(){
+            Promise.all(g.codes.filter(function(c){ const x = by[c].meta; return anyOpen ? x.open !== false : !x.wait; }).map(function(c){ return db.ref('polls/' + c + '/meta/open').set(!anyOpen); })).then(function(){ list(); });
+          });
           el.querySelector('[data-act=csv]').addEventListener('click', function(){
             // 누른 때의 답을 새로 읽어서 내려받음. 묶음이면 질문마다 한 덩어리씩 이어서 한 파일로
-            const sb = sibOf(m).length > 1 ? sibOf(m) : [code], q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+            const sb = g.codes, q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
             Promise.all(sb.map(function(c){ return db.ref('polls/' + c).once('value').then(function(p){ return p.val(); }); })).then(function(vs){
               if (sb.length < 2) { if (vs[0] && vs[0].meta) csv(code, vs[0].meta, vs[0].votes); return; }
               saveCsv('헤아림_' + sb[0] + '_묶음.csv', vs.map(function(v, i){ return v && v.meta ? [q('질문 ' + (i + 1)), q(v.meta.q), q(sb[i])].join(',') + '\n' + csvBody(v.meta, v.votes) : ''; }).join('\n'));
             });
           });
           armed(el.querySelector('[data-act=del]'), '한 번 더 누르면 지워요', function(){
-            // 답을 먼저 지우고(주인만 가능) 설문을 지움
-            db.ref('keys/' + code).remove().catch(function(){}).then(function(){ return db.ref('polls/' + code + '/votes').remove(); }).then(function(){ return db.ref('polls/' + code + '/meta').remove(); }).then(function(){ return db.ref('users/' + user.uid + '/polls/' + code).remove(); }).then(function(){
-              // 묶음에서 빠지면 남은 질문들의 순서 목록도 고침
-              const rest = sibOf(m).filter(function(c){ return c !== code; });
-              return Promise.all(rest.map(function(c){ return rest.length > 1 ? db.ref('polls/' + c + '/meta/sib').set(rest) : Promise.all([db.ref('polls/' + c + '/meta/sib').remove(), db.ref('polls/' + c + '/meta/flow').remove()]); }));
-            }).then(function(){ if ((editing && editing.code === code) || (appending && appending.code === code)) { form.reset(); $('mm').innerHTML = ''; } list(); });
+            // 퀴즈 번호·점수 → 답 → 설문 순서로 지움(주인만 가능)
+            Promise.all([db.ref('seats/' + code).remove().catch(function(){}), db.ref('skeys/' + code).remove().catch(function(){}), db.ref('scores/' + code).remove().catch(function(){})])
+              .then(function(){ return g.codes.reduce(function(p, c){ return p.then(function(){ return wipe(c); }); }, Promise.resolve()); })
+              .then(function(){ if (eset && eset.codes.some(function(c){ return g.codes.indexOf(c) >= 0; })) { form.reset(); $('mm').innerHTML = ''; } list(); });
           });
         });
       });

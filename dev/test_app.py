@@ -119,7 +119,7 @@ try:
     check('목록: 마감 · 답 6명', '마감' in t.inner_text('.poll') and '답 6명' in t.inner_text('.poll'))
     # 고치기 (답이 6명 있는 설문)
     t.locator('.poll [data-act=edit]').first.click(); t.wait_for_timeout(200)
-    check('고치기: 칸에 내용이 채워지고 · 답이 있어 보기 빼기는 잠김', t.input_value('#mq')=='어떻게 보여 주면 모두가 꾸준히 뛸까요?' and t.locator('#mo input').count()==4 and t.locator('#mo button:disabled').count()==4 and '6명' in t.inner_text('#me') and t.input_value('#ml')=='https://musicalpe.github.io/apps/' and '고친 내용 저장' in t.inner_text('#mc'))
+    check('고치기: 칸에 내용이 채워지고 · 답이 있어 보기 빼기는 잠김', t.input_value('#mq')=='어떻게 보여 주면 모두가 꾸준히 뛸까요?' and t.locator('#mo input').count()==4 and t.locator('#mo button:disabled').count()==4 and '6명' in t.inner_text('#qs') and t.input_value('#ml')=='https://musicalpe.github.io/apps/' and '고친 내용 저장' in t.inner_text('#mc'))
     t.locator('#mo input').nth(1).fill(''); t.click('#mc'); e0='비울 수 없어요' in t.inner_text('#mm')
     t.click('#mx'); t.wait_for_timeout(100)
     check('고치기: 답 있는 보기는 못 비움 · 그만두기 하면 그대로', e0 and t.input_value('#mq')=='' and '설문 만들기' in t.inner_text('#mc') and dbget('polls/%s/meta/q'%code)=='어떻게 보여 주면 모두가 꾸준히 뛸까요?')
@@ -255,13 +255,15 @@ try:
     t.fill('#mq','줄넘기는 유산소 운동이다'); t.click('#mox'); t.select_option('#mans','0'); t.select_option('#mqz','solo'); t.wait_for_timeout(100)
     e0=t.locator('#mqs').is_visible(); t.fill('#msn','5'); t.click('#mc'); t.wait_for_timeout(900)
     Q1=t.locator('.poll').first.get_attribute('data-code'); q1=dbget('polls/%s/meta'%Q1)
-    t.locator('.poll[data-code="%s"] [data-act=add]'%Q1).click(); t.wait_for_timeout(300)
-    e1=t.input_value('#mqz')=='solo' and t.input_value('#msn')=='5'
-    t.fill('#mq','줄을 돌리는 힘은 주로 어디에서?')
+    qn=lambda i: t.locator('#qs .qb').nth(i)
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%Q1).click(); t.wait_for_timeout(700); t.click('#qadd'); t.wait_for_timeout(100)
+    e1=t.input_value('#mqz')=='solo' and t.input_value('#msn')=='5' and t.input_value('#mans')=='0' and '퀴즈 고치기' in t.inner_text('#mh') and not t.locator('#mfw').is_visible()
+    qn(1).locator('.q-q').fill('줄을 돌리는 힘은 주로 어디에서?')
     for i,o in enumerate(['어깨','허리','손목']):
-        if i>=2: t.click('#ma')
-        t.locator('#mo input').nth(i).fill(o)
-    t.select_option('#mans','2'); t.click('#mc'); t.wait_for_timeout(1200)
+        if i>=2: qn(1).locator('.q-add').click()
+        qn(1).locator('.q-o input').nth(i).fill(o)
+    t.click('#mc'); t.wait_for_timeout(300); e1=e1 and '질문 2: 정답을 골라 주세요' in t.inner_text('#mm')
+    qn(1).locator('.q-ans').select_option('2'); t.click('#mc'); t.wait_for_timeout(1500)
     Q2=sibs(Q1)[1] if len(sibs(Q1))==2 else ''; q2=dbget('polls/%s/meta'%Q2) if Q2 else {}
     check('혼자 풀기 만들기: 학생 수 · 결과 보여 주기는 꺼짐 · 이은 질문도 같은 방식(스스로 넘어가기)', e0 and e1 and q1.get('qz')=='solo' and q1.get('seats')==5 and q1.get('res') is False and q2.get('qz')=='solo' and q2.get('seats')==5 and q2.get('flow')=='self' and getc('keys/'+Q2,'teacher1')=={'a':2})
     def student(num, a1, a2):
@@ -319,29 +321,46 @@ try:
     for x in (s1,s2,s3): x.context.close()
     qa.close(); qb.close()
     t.reload(); t.wait_for_timeout(900)
-    for c in (Q2,Q1):
-        d=t.locator('.poll[data-code="%s"] [data-act=del]'%c); d.click(); d.click(); t.wait_for_timeout(1000)
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%Q1); d.click(); d.click(); t.wait_for_timeout(1500)
+    check('묶음 지우기: 질문 전체와 정답이 함께 지워짐', dbget('polls/%s'%Q1) is None and dbget('polls/%s'%Q2) is None and getc('keys/'+Q2,'__admin') is None and t.locator('.poll[data-code="%s"]'%Q1).count()==0)
+    # ===== 한 칸에서 여러 질문을 한 번에 만들기 =====
+    t.reload(); t.wait_for_timeout(800); qn=lambda i: t.locator('#qs .qb').nth(i)
+    n0=t.locator('#qs .qb').count()==1 and not qn(0).locator('.q-del').is_visible() and not t.locator('#mfw').is_visible()
+    t.fill('#mq','하나째'); t.locator('#mo input').nth(0).fill('가'); t.locator('#mo input').nth(1).fill('나')
+    t.click('#qadd'); t.click('#qadd'); t.wait_for_timeout(100)
+    qn(1).locator('.q-t1').check(); qn(1).locator('.q-q').fill('둘째'); qn(1).locator('.q-max').select_option('2')
+    qn(2).locator('.q-o input').nth(0).fill('예'); t.click('#mc'); t.wait_for_timeout(300); n1='질문 3: 질문을 적어 주세요' in t.inner_text('#mm')
+    qn(2).locator('.q-q').fill('셋째'); t.click('#mc'); t.wait_for_timeout(300); n2='질문 3: 보기를 2개 넘게' in t.inner_text('#mm')
+    qn(2).locator('.q-o input').nth(1).fill('아니오'); t.click('#mc'); t.wait_for_timeout(1600)
+    M1=t.locator('.poll').first.get_attribute('data-code'); ms=sibs(M1); mm=[dbget('polls/%s/meta'%c) for c in ms]
+    check('여러 질문을 한 번에 만들기: 질문 더하기 · 질문마다 모자란 곳 안내 · 저장하면 번호 셋이 묶음으로', n0 and n1 and n2 and len(ms)==3 and ms[0]==M1 and [m['q'] for m in mm]==['하나째','둘째','셋째'] and mm[1].get('type')=='text' and mm[1].get('max')==2 and all(sibs(c)==ms for c in ms) and all(m.get('flow')=='self' and m['open'] is True for m in mm) and '3개가 한 묶음' in t.inner_text('#mm') and t.locator('#qs .qb').count()==1 and t.input_value('#mq')=='' and '외 2개' in t.inner_text('.poll[data-code="%s"]'%M1))
+    ob=t.locator('.poll[data-code="%s"] [data-act=open]'%M1); ob.click(); t.wait_for_timeout(900); n3=all(dbget('polls/%s/meta/open'%c) is False for c in ms) and '마감' in t.inner_text('.poll[data-code="%s"] .tag'%M1)
+    t.locator('.poll[data-code="%s"] [data-act=open]'%M1).click(); t.wait_for_timeout(900); n4=all(dbget('polls/%s/meta/open'%c) is True for c in ms)
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%M1); d.click(); d.click(); t.wait_for_timeout(1500)
+    check('묶음 카드: 마감하기·다시 받기·지우기가 질문 전체에', n3 and n4 and all(dbget('polls/%s'%c) is None for c in ms))
     # ===== 질문 잇기 (묶음) =====
     sibs=lambda c: (lambda v: (list(v.values()) if isinstance(v,dict) else v) or [])(dbget('polls/%s/meta/sib'%c))
     t.reload(); t.wait_for_timeout(800)
     t.fill('#mq','첫째 질문'); t.locator('#mo input').nth(0).fill('가'); t.locator('#mo input').nth(1).fill('나'); t.fill('#ml','https://musicalpe.github.io/apps/'); t.click('#mc'); t.wait_for_timeout(800)
     A=t.locator('.poll').first.get_attribute('data-code')
-    t.locator('.poll[data-code="%s"] [data-act=add]'%A).click(); t.wait_for_timeout(200)
-    e0='질문 잇기' in t.inner_text('#mh') and t.locator('#mfw').is_visible() and A in t.inner_text('#me') and '이 질문 잇기' in t.inner_text('#mc')
-    t.check('#mt1'); t.fill('#mq','둘째 질문'); t.click('#mc'); t.wait_for_timeout(900)
+    qn=lambda i: t.locator('#qs .qb').nth(i)
+    eA=lambda: (t.locator('.poll[data-code="%s"] [data-act=edit]'%A).click(), t.wait_for_timeout(500))
+    eA(); x0=not t.locator('#mfw').is_visible() and not qn(0).locator('.q-del').is_visible(); t.click('#qadd'); t.wait_for_timeout(100)
+    e0=x0 and '설문 고치기' in t.inner_text('#mh') and t.locator('#mfw').is_visible() and A in t.inner_text('#me') and '고친 내용 저장' in t.inner_text('#mc') and t.locator('#qs .qb').count()==2 and qn(1).locator('.q-del').is_visible() and t.locator('#mq').count()==1
+    qn(1).locator('.q-t1').check(); qn(1).locator('.q-q').fill('둘째 질문'); t.click('#mc'); t.wait_for_timeout(1300)
     B=[c for c in sibs(A) if c!=A][0] if len(sibs(A))==2 else ''
-    check('질문 잇기: 둘째 질문이 묶음으로 이어짐 (두 설문 모두 순서 목록·넘어가는 방식)', e0 and sibs(A)==[A,B] and sibs(B)==[A,B] and dbget('polls/%s/meta/flow'%A)=='self' and dbget('polls/%s/meta/flow'%B)=='self' and dbget('polls/%s/meta/type'%B)=='text' and '2개가 한 묶음' in t.inner_text('#mm') and '설문 만들기' in t.inner_text('#mh'))
-    e1=t.locator('.poll[data-code="%s"] [data-act=add]'%A).count()==0
-    t.locator('.poll[data-code="%s"] [data-act=add]'%B).click(); t.wait_for_timeout(200); t.fill('#mq','셋째 질문'); t.locator('#mo input').nth(0).fill('예'); t.locator('#mo input').nth(1).fill('아니오'); t.select_option('#mfl','with'); t.click('#mc'); t.wait_for_timeout(900)
+    check('질문 잇기: 둘째 질문이 묶음으로 이어짐 (두 설문 모두 순서 목록·넘어가는 방식)', e0 and sibs(A)==[A,B] and sibs(B)==[A,B] and dbget('polls/%s/meta/flow'%A)=='self' and dbget('polls/%s/meta/flow'%B)=='self' and dbget('polls/%s/meta/type'%B)=='text' and '고쳤어요' in t.inner_text('#mm') and '설문 만들기' in t.inner_text('#mh') and dbget('polls/%s/meta/q'%A)=='첫째 질문')
+    eA(); e1=t.locator('#qs .qb').count()==2 and qn(1).locator('.q-q').input_value()=='둘째 질문' and qn(1).locator('.q-t1').is_checked() and qn(1).locator('.q-t0').is_disabled()
+    t.click('#qadd'); qn(2).locator('.q-q').fill('셋째 질문'); qn(2).locator('.q-o input').nth(0).fill('예'); qn(2).locator('.q-o input').nth(1).fill('아니오'); t.select_option('#mfl','with'); t.click('#mc'); t.wait_for_timeout(1500)
     C=sibs(A)[2] if len(sibs(A))==3 else ''
-    order=[e.get_attribute('data-code') for e in t.locator('.poll').all()][:3]
-    check('질문 잇기: 셋째까지 · 넘어가는 방식을 바꾸면 묶음 전체에 적용 · 목록에 순서대로', e1 and sibs(A)==[A,B,C]==sibs(B)==sibs(C) and [dbget('polls/%s/meta/flow'%c) for c in (A,B,C)]==['with']*3 and order==[A,B,C] and '묶음 1/3' in t.inner_text('.poll[data-code="%s"]'%A) and '묶음 3/3' in t.inner_text('.poll[data-code="%s"]'%C), str(order))
+    card=t.inner_text('.poll[data-code="%s"]'%A)
+    check('질문 더하기: 셋째까지 · 넘어가는 방식은 묶음 전체에 · 목록에는 카드 하나에 질문 순서대로', e1 and sibs(A)==[A,B,C]==sibs(B)==sibs(C) and [dbget('polls/%s/meta/flow'%c) for c in (A,B,C)]==['with']*3 and t.locator('.poll[data-code="%s"]'%B).count()==0 and '질문 3개' in card and '외 2개' in card and t.locator('.poll[data-code="%s"] .qlist li'%A).count()==3 and card.index('둘째 질문')<card.index('셋째 질문'), card[:120])
     # 선생님과 함께 넘어가기
     W=b.new_context(viewport={'width':390,'height':800}); setup(W); wp=W.new_page(); wp.on('pageerror',lambda e: errs.append(str(e))); wp.goto(APP+'?p='+A); wp.wait_for_timeout(500)
     e2='질문 1 / 3' in wp.inner_text('#jc'); wp.locator('.opt').nth(0).click(); wp.click('#js'); wp.wait_for_timeout(500)
     check('함께 넘어가기: 답을 내면 다음 QR을 기다리라는 안내 (다음 단추·끝 주소 없음)', e2 and wp.locator('#jnx').count()==0 and 'QR을 찍어' in wp.inner_text('#jc') and '앱 모음' not in wp.inner_text('#jc')); W.close()
     # 고치기로 스스로 넘어가기로 바꿈
-    t.locator('.poll[data-code="%s"] [data-act=edit]'%B).click(); t.wait_for_timeout(200); e3=t.locator('#mfw').is_visible() and t.input_value('#mfl')=='with'
+    eA(); e3=t.locator('#mfw').is_visible() and t.input_value('#mfl')=='with' and t.locator('#qs .qb').count()==3
     t.select_option('#mfl','self'); t.click('#mc'); t.wait_for_timeout(900)
     check('고치기: 넘어가는 방식을 바꾸면 묶음 전체에 적용 · 순서 목록 그대로', e3 and [dbget('polls/%s/meta/flow'%c) for c in (A,B,C)]==['self']*3 and sibs(B)==[A,B,C] and dbget('polls/%s/meta/type'%B)=='text')
     S=b.new_context(viewport={'width':390,'height':800}); setup(S); sp=S.new_page(); sp.on('pageerror',lambda e: errs.append(str(e))); sp.goto(APP+'?p='+A); sp.wait_for_timeout(500)
@@ -364,10 +383,10 @@ try:
     check('묶음 답 내려받기: 질문 셋이 한 파일에', '묶음' in dl.value.suggested_filename and csv.count('"질문 ')==3 and '줄넘기' in csv and '둘째 질문' in csv)
     # 선생님과 함께: 뒤 질문은 닫혀 있다가 쪽을 넘기면 열림
     t.reload(); t.wait_for_timeout(900)
-    t.locator('.poll[data-code="%s"] [data-act=add]'%C).click(); t.wait_for_timeout(200); t.fill('#mq','넷째 질문'); t.locator('#mo input').nth(0).fill('좋아요'); t.locator('#mo input').nth(1).fill('글쎄요'); t.select_option('#mfl','with'); t.click('#mc'); t.wait_for_timeout(1200)
+    eA(); t.click('#qadd'); qn(3).locator('.q-q').fill('넷째 질문'); qn(3).locator('.q-o input').nth(0).fill('좋아요'); qn(3).locator('.q-o input').nth(1).fill('글쎄요'); t.select_option('#mfl','with'); t.click('#mc'); t.wait_for_timeout(1600)
     D=sibs(A)[3] if len(sibs(A))==4 else ''
     md=lambda c: dbget('polls/%s/meta'%c)
-    check('함께 넘어가기로 이으면: 새 질문은 대기(닫힘) · 이미 답이 있는 앞 질문은 열린 채', md(D).get('open') is False and md(D).get('wait') is True and all(md(c).get('open') is True and md(c).get('wait') is None for c in (A,B,C)) and '대기' in t.inner_text('.poll[data-code="%s"]'%D) and [md(c)['flow'] for c in (A,B,C,D)]==['with']*4)
+    check('함께 넘어가기로 이으면: 새 질문은 대기(닫힘) · 이미 답이 있는 앞 질문은 열린 채', md(D).get('open') is False and md(D).get('wait') is True and all(md(c).get('open') is True and md(c).get('wait') is None for c in (A,B,C)) and '대기' in t.inner_text('.poll[data-code="%s"] .qlist li:nth-child(4)'%A) and [md(c)['flow'] for c in (A,B,C,D)]==['with']*4)
     WW=b.new_context(viewport={'width':390,'height':800}); setup(WW); wq=WW.new_page(); wq.on('pageerror',lambda e: errs.append(str(e))); wq.goto(APP+'?p='+D); wq.wait_for_timeout(600)
     e20='아직 열리지 않은' in wq.inner_text('#jc') and wq.locator('.opt').count()==0 and '질문 4 / 4' in wq.inner_text('#jc')
     r401=0
@@ -382,10 +401,13 @@ try:
     e23=md(D).get('open') is True and md(D).get('wait') is None and '아직 열기 전' not in ob.inner_text('#bm') and md(C).get('open') is True
     wq.click('#jrl'); wq.wait_for_timeout(800); e24=wq.locator('.opt').count()==2; wq.locator('.opt').nth(0).click(); wq.click('#js'); wq.wait_for_timeout(600)
     check('만든 사람이 쪽을 넘기면 그 질문이 열림 (바로 열어 볼 때는 안 열림) · 앞 질문은 계속 열림 · 참여자가 이어서 답함', e22 and e23 and e24 and len(dbget('polls/%s/votes'%D))==1 and '1' in ob.inner_text('.b-count'), '%s %s %s'%(e22,e23,e24)); ob.close(); WW.close()
-    t.reload(); t.wait_for_timeout(900); d=t.locator('.poll[data-code="%s"] [data-act=del]'%D); d.click(); d.click(); t.wait_for_timeout(1000)
-    d=t.locator('.poll[data-code="%s"] [data-act=del]'%B); d.click(); d.click(); t.wait_for_timeout(1000); e11=sibs(A)==[A,C]==sibs(C) and dbget('polls/%s'%B) is None
-    d=t.locator('.poll[data-code="%s"] [data-act=del]'%C); d.click(); d.click(); t.wait_for_timeout(1000)
-    check('묶음에서 질문을 지우면 남은 순서가 고쳐지고 · 하나만 남으면 묶음이 풀림', e11 and sibs(A)==[] and dbget('polls/%s/meta/flow'%A) is None and '묶음' not in t.inner_text('.poll[data-code="%s"]'%A) and t.locator('.poll[data-code="%s"] [data-act=add]'%A).count()==1)
+    t.reload(); t.wait_for_timeout(900)
+    def dropq(i):
+        eA(); d=qn(i).locator('.q-del'); d.click(); d.click(); t.wait_for_timeout(200); t.click('#mc'); t.wait_for_timeout(1500)
+    dropq(3); e10=dbget('polls/%s'%D) is None and sibs(A)==[A,B,C]
+    dropq(1); e11=sibs(A)==[A,C]==sibs(C) and dbget('polls/%s'%B) is None and dbget('polls/%s/meta/q'%C)=='셋째 질문' and len(dbget('polls/%s/votes'%A))>=2
+    dropq(1)
+    check('고치기에서 질문을 지우면 남은 순서가 고쳐지고(답이 있으면 두 번 눌러야 지워짐) · 하나만 남으면 묶음이 풀림', e10 and e11 and dbget('polls/%s'%C) is None and sibs(A)==[] and dbget('polls/%s/meta/flow'%A) is None and '외 ' not in t.inner_text('.poll[data-code="%s"]'%A) and t.locator('.poll[data-code="%s"] .qlist'%A).count()==0, '%s %s'%(e10,e11))
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%A); d.click(); d.click(); t.wait_for_timeout(900)
     # ===== 확인한 뒤 띄우기 =====
     t.check('#mt1'); t.fill('#mq','하고 싶은 말'); t.check('#mmod'); t.click('#mc'); t.wait_for_timeout(800)
