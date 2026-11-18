@@ -323,6 +323,51 @@ try:
     t.reload(); t.wait_for_timeout(900)
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%Q1); d.click(); d.click(); t.wait_for_timeout(1500)
     check('묶음 지우기: 질문 전체와 정답이 함께 지워짐', dbget('polls/%s'%Q1) is None and dbget('polls/%s'%Q2) is None and getc('keys/'+Q2,'__admin') is None and t.locator('.poll[data-code="%s"]'%Q1).count()==0)
+    # ===== 골든벨 (번호 입장 · 틀리면 탈락 · 부활 문제) =====
+    t.reload(); t.wait_for_timeout(800); t.click('#tb1'); qn=lambda i: t.locator('#qs .qb').nth(i)
+    t.select_option('#mqz','bell'); t.wait_for_timeout(100); g0=t.locator('#mbw').is_visible() and t.locator('#mqs').is_visible() and not t.locator('#mres').is_visible()
+    t.fill('#msn','4'); t.fill('#mq','골든벨 하나'); t.click('#mox'); t.select_option('#mans','0')
+    t.click('#qadd'); qn(1).locator('.q-q').fill('골든벨 둘'); qn(1).locator('.q-add').click()
+    for i,o in enumerate(['가','나','다']): qn(1).locator('.q-o input').nth(i).fill(o)
+    qn(1).locator('.q-ans').select_option('1')
+    t.click('#qadd'); qn(2).locator('.q-q').fill('골든벨 부활'); qn(2).locator('.q-ox').click(); qn(2).locator('.q-ans').select_option('1'); qn(2).locator('.q-rv').check()
+    g1=not qn(0).locator('.q-rvw').is_visible() and qn(1).locator('.q-rvw').is_visible() and not t.locator('#mfw').is_visible()
+    t.click('#mc'); t.wait_for_timeout(1800)
+    G1=t.locator('.poll').first.get_attribute('data-code'); gs=sibs(G1); gm=[dbget('polls/%s/meta'%c) for c in gs]; G2,G3=(gs+['',''])[1:3]
+    check('골든벨 만들기: 푸는 방식 골든벨 · 부활 문제는 둘째부터 · 선생님과 함께로 저장(뒤 문제는 대기)', g0 and g1 and len(gs)==3 and all(m.get('qz')=='bell' and m.get('flow')=='with' and m.get('nshow') is True and m.get('seats')==4 for m in gm) and [m.get('rv') for m in gm]==[None,None,True] and [m.get('wait') for m in gm]==[None,True,True] and '골든벨' in t.inner_text('.poll[data-code="%s"]'%G1) and '부활 문제' in t.inner_text('.poll[data-code="%s"] .qlist'%G1), str([(m.get('qz'),m.get('rv'),m.get('wait')) for m in gm]))
+    gb=T.new_page(); gb.on('pageerror',lambda e: errs.append(str(e))); gb.goto(APP+'?b='+G1); gb.wait_for_timeout(1200)
+    def bst(num):
+        C=b.new_context(viewport={'width':390,'height':800}); setup(C); pg=C.new_page(); pg.on('pageerror',lambda e: errs.append(str(e))); pg.goto(APP+'?p='+G1); pg.wait_for_timeout(700)
+        pg.locator('.seat[data-n="%d"]'%num).click(); pg.click('#jsn'); pg.wait_for_timeout(900); return pg
+    def ans(pg,i): pg.locator('.opt').nth(i).click(); pg.click('#js'); pg.wait_for_timeout(700)
+    jc=lambda pg: pg.inner_text('#jc')
+    b1,b2,b3=bst(1),bst(2),bst(3); g2='1번으로 들어왔어요' in jc(b1) and '질문 1 / 3' in jc(b1)
+    ans(b1,0); ans(b2,1); g3='기다려요' in jc(b1) and b1.locator('#jch').count()==1
+    gb.wait_for_timeout(500); g4=gb.locator('.bar').count()==0 and '답하는 중' in gb.inner_text('#bm') and '2' in gb.inner_text('.b-count') and gb.locator('.b-alive').count()==0 and gb.locator('#btb').count()==1 and gb.locator('#bsc').count()==0
+    gb.click('#bans'); gb.wait_for_timeout(4500)
+    bsum=dbget('scores/%s/bell'%G1); gk=getc('skeys/'+G1,'teacher1'); gp=lambda nn: gk[str(nn)] if isinstance(gk,dict) else gk[nn]
+    check('골든벨 1번 문제: 답하는 동안 그래프 숨김 · 정답을 보이면 맞은 친구만 살아남음(안 낸 친구도 탈락) · 아이 화면이 스스로 바뀜', g2 and g3 and g4 and '살아남았어요' in jc(b1) and '맞았어요' in jc(b1) and '탈락했어요' in jc(b2) and '탈락했어요' in jc(b3) and bsum['a']==1 and bsum['k']==3 and dbget('scores/%s/%s'%(G1,gp(2)))=={'o':1,'i':0} and dbget('scores/%s/%s'%(G1,gp(1)))=={'o':0,'i':0}, '%s | %s | %s'%(jc(b1)[-60:],jc(b3)[-60:],bsum))
+    al=gb.inner_text('.b-alive').replace('\n',' ')
+    check('골든벨 큰 화면: 남은 사람 수 · 살아남은 번호 표시(탈락 번호는 흐리게) · 정답 뒤 그래프', '남은 사람 1' in al and '/ 3명' in al and gb.locator('.b-seats span').count()==3 and gb.locator('.b-seats span.gone').count()==2 and gb.locator('.b-seats span:not(.gone)').inner_text()=='1' and gb.locator('.bar').count()==2, al)
+    gb.click('#bnx'); gb.wait_for_timeout(5000)
+    g5=('p='+G2) in b1.url and ('p='+G2) in b2.url and b1.locator('.opt').count()==3 and b2.locator('.opt').count()==0 and '이번 문제는 지켜봐요' in jc(b2) and dbget('polls/%s/meta/open'%G2) is True
+    ans(b1,1); gb.click('#bans'); gb.wait_for_timeout(4500); g6='살아남았어요' in jc(b1) and dbget('scores/%s/bell'%G1)['a']==1
+    check('골든벨 2번 문제: 쪽을 넘기면 아이 화면도 다음 문제로 · 탈락한 친구는 못 풀고 지켜봄', g5 and g6, '%s %s | %s'%(g5,g6,jc(b2)[-80:]))
+    gb.click('#bnx'); gb.wait_for_timeout(5000)
+    g7='부활 문제' in gb.inner_text('.b-q') and '살아남은 친구는 잠깐 쉬어요' in jc(b1) and b1.locator('.opt').count()==0 and b2.locator('.opt').count()==2 and '부활 문제' in jc(b2)
+    ans(b2,1); ans(b3,0); gb.click('#bans'); gb.wait_for_timeout(4500); bsum=dbget('scores/%s/bell'%G1); ns=list(bsum['ns'].values()) if isinstance(bsum.get('ns'),dict) else bsum.get('ns')
+    check('골든벨 부활 문제: 탈락한 친구만 풀고 · 맞히면 다시 살아남 · 틀리면 그대로 · 끝 안내', g7 and '다시 살아났어요' in jc(b2) and '아직 탈락' in jc(b3) and '살아남았어요' in jc(b1) and '끝까지 살아남았어요' in jc(b2) and '골든벨이 끝났어요' in jc(b3) and bsum['a']==2 and ns==[1,2] and '남은 사람 2' in gb.inner_text('.b-alive').replace('\n',' ') and gb.locator('.b-seats span.gone').count()==1, '%s | %s | %s'%(g7,jc(b2)[-70:],bsum))
+    # 처음부터 · 남은 수만 보여 주기
+    r=gb.locator('#brs'); r.click(); r.click(); gb.wait_for_timeout(1800)
+    g8=dbget('seats/'+G1) is None and dbget('scores/%s/bell'%G1) is None and [dbget('polls/%s/meta/wait'%c) for c in gs]==[None,True,True] and [dbget('polls/%s/meta/open'%c) for c in gs]==[True,False,False] and all(dbget('polls/%s/meta/rev'%c) is None for c in gs) and ('b='+G1) in gb.url and gb.locator('.b-alive').count()==0
+    b1.wait_for_timeout(4500); g9=('p='+G1) in b1.url and b1.locator('.seat').count()==4
+    t.reload(); t.wait_for_timeout(900); t.locator('.poll[data-code="%s"] [data-act=edit]'%G1).click(); t.wait_for_timeout(800)
+    g10=t.input_value('#mqz')=='bell' and t.input_value('#mns')=='1' and qn(2).locator('.q-rv').is_checked() and not qn(1).locator('.q-rv').is_checked() and qn(2).locator('.q-ans').input_value()=='1'
+    t.select_option('#mns','0'); t.click('#mc'); t.wait_for_timeout(1500); g11=all(dbget('polls/%s/meta/nshow'%c) is None for c in gs) and [dbget('polls/%s/meta/wait'%c) for c in gs]==[None,True,True] and dbget('polls/%s/meta/rv'%G3) is True
+    b1.locator('.seat[data-n="4"]').click(); b1.click('#jsn'); b1.wait_for_timeout(900); ans(b1,1); gb.wait_for_timeout(600); gb.click('#bans'); gb.wait_for_timeout(4500); bsum=dbget('scores/%s/bell'%G1)
+    check('골든벨: 퀴즈 처음부터(번호·결과 지우고 뒤 문제 다시 대기, 아이는 번호부터) · 고치기에 그대로 채워짐 · 남은 사람 수만 보여 주기', g8 and g9 and g10 and g11 and bsum['a']==0 and bsum['k']==1 and 'ns' not in bsum and '남은 사람 0' in gb.inner_text('.b-alive').replace('\n',' ') and gb.locator('.b-seats').count()==0 and '탈락했어요' in jc(b1), '%s %s %s %s %s'%(g8,g9,g10,g11,bsum))
+    for x in (b1,b2,b3): x.context.close()
+    gb.close(); d=t.locator('.poll[data-code="%s"] [data-act=del]'%G1); d.click(); d.click(); t.wait_for_timeout(1500)
     # ===== 한 칸에서 여러 질문을 한 번에 만들기 =====
     t.reload(); t.wait_for_timeout(800); qn=lambda i: t.locator('#qs .qb').nth(i)
     n0=t.locator('#qs .qb').count()==1 and not qn(0).locator('.q-del').is_visible() and not t.locator('#mfw').is_visible()
