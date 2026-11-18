@@ -41,8 +41,8 @@
   .btn.danger.armed { background: var(--warn); border-color: var(--warn); color: #fff; }
   .btn:disabled { opacity: .5; cursor: default; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  input[type=text], textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
-  input[type=text]:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+  input[type=text], input[type=number], textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  input[type=text]:focus, input[type=number]:focus, textarea:focus, select:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
   label.f { display: block; font-weight: 700; margin: 14px 0 6px; }
   label.chk { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; cursor: pointer; }
   label.chk input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--brand); flex: none; }
@@ -207,7 +207,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '1.9.1';
+const VERSION = '1.9.2';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -344,7 +344,7 @@ function cloudUpdate(el, t, onPick){
 // 퀴즈: 정답은 만든 사람만 읽는 칸(keys)에 따로 두고, '정답 보이기'를 누르면 meta.rev 에 적혀 모두에게 보임
 // 퀴즈(번호 입장): qz 는 'solo'(혼자 풀기) 또는 'bell'(골든벨). 번호·점수는 묶음의 첫 질문 번호(root) 아래에 둠
 const qzOf = function(meta){ return meta && (meta.qz === 'solo' || meta.qz === 'bell') ? meta.qz : ''; };
-const seatsOf = function(meta){ return Math.min(40, Math.max(2, Number(meta && meta.seats) || 30)); };
+const seatsOf = function(meta){ return Math.min(40, Math.max(1, Number(meta && meta.seats) || 30)); };
 const rootOf = function(meta, code){ return sibOf(meta)[0] || code; };
 const revOf = function(meta){ return meta && typeof meta.rev === 'number' ? meta.rev : -1; };
 const OKT = '<em class="okt">정답</em>';
@@ -809,7 +809,7 @@ function pageHome(){
       '<div id="mtx" hidden><label class="f" for="mmx">한 사람이 낼 수 있는 답</label><select id="mmx"><option value="1">1개</option><option value="2">2개까지</option><option value="3">3개까지</option><option value="4">4개까지</option><option value="5">5개까지</option></select><p class="hint" style="margin:8px 0 0">답은 20자까지 받고, 글자와 숫자만 남겨요(기호는 빠져요). 적은 답은 결과 화면에 그대로 뜨고, 만든 사람은 글자를 눌러 숨길 수 있어요.</p><label class="chk"><input type="checkbox" id="mmod"><span>확인한 뒤 띄우기 <span class="hint">(내가 띄운 답만 결과 화면에 나와요)</span></span></label></div>' +
       '<div id="mfw" hidden><label class="f" for="mfl">다음 질문으로 넘어가는 방식</label><select id="mfl"><option value="self">답을 내면 스스로 다음 질문으로</option><option value="with">선생님이 쪽을 넘기면 그 QR을 다시 찍기</option></select><p class="hint" style="margin:8px 0 0">선생님과 함께로 하면 뒤 질문은 닫혀 있다가, 결과 화면에서 그 쪽으로 넘길 때 열려요. 앞 질문은 계속 열려 있어요.</p></div>' +
       '<div id="mqzw"><label class="f" for="mqz">푸는 방식</label><select id="mqz" style="max-width:100%"><option value="">함께 풀기 (번호 없이 · 선생님이 정답을 보여 줘요)</option><option value="solo">혼자 풀기 (번호로 들어와 끝까지 풀고, 맞은 개수를 각자 확인)</option></select></div>' +
-      '<div id="mqs" hidden><label class="f" for="msn">학생 수 <span class="hint" style="font-weight:400">(1번부터 · 2~40)</span></label><input type="number" id="msn" min="2" max="40" value="30" inputmode="numeric" style="max-width:120px"><p class="hint" style="margin:8px 0 0">이름 대신 번호를 골라 들어와요. 질문에 학교·학년·반 이름은 적지 않는 것이 좋아요. 번호와 결과는 결과 화면의 퀴즈 처음부터로 지울 수 있어요. 문제마다 정답을 꼭 넣어 주세요.</p></div>' +
+      '<div id="mqs" hidden><label class="f" for="msn">학생 수 <span class="hint" style="font-weight:400">(1~40)</span></label><input type="number" id="msn" min="1" max="40" value="30" inputmode="numeric" style="max-width:120px"><p class="hint" style="margin:8px 0 0">이름 대신 번호를 골라 들어와요. 질문에 학교·학년·반 이름은 적지 않는 것이 좋아요. 번호와 결과는 결과 화면의 퀴즈 처음부터로 지울 수 있어요. 문제마다 정답을 꼭 넣어 주세요.</p></div>' +
       '<label class="chk"><input type="checkbox" id="mres" checked><span>답을 낸 사람에게 결과 보여 주기</span></label>' +
       '<label class="f" for="ml">끝나고 보여 줄 주소 <span class="hint" style="font-weight:400">(안 써도 돼요)</span></label><input type="text" id="ml" inputmode="url" autocapitalize="none" placeholder="https://"><input type="text" id="mll" maxlength="30" placeholder="단추에 쓸 말 (예: 자료 보러 가기)" style="margin-top:8px">' +
       '<div id="mm"></div><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="mc">설문 만들기</button><button type="button" class="btn" id="mx" hidden>그만두기</button></div>';
@@ -906,7 +906,7 @@ function pageHome(){
     if (form.kind() === 'quiz' && !isT && ans < 0) return bad('정답을 골라 주세요.');
     const meta = { owner: user.uid, q: q.slice(0, 200), opts: opts.map(function(o){ return o.slice(0, 60); }), open: true, ask: $('mask').checked, res: $('mres').checked, at: Date.now() };
     if (isT) { delete meta.opts; meta.type = 'text'; meta.max = Math.min(5, Math.max(1, Number($('mmx').value) || 1)); meta.ask = false; if ($('mmod').checked) meta.mod = true; }
-    const qz = $('mqz').value === 'solo' ? 'solo' : '', seatsN = Math.min(40, Math.max(2, Math.round(Number($('msn').value)) || 30));
+    const qz = $('mqz').value === 'solo' ? 'solo' : '', seatsN = Math.min(40, Math.max(1, Math.round(Number($('msn').value)) || 30));
     const flow = qz === 'solo' ? 'self' : ($('mfl').value === 'with' ? 'with' : 'self');
     if (qz) { meta.qz = qz; meta.seats = seatsN; meta.res = false; }
     if (link) { meta.link = link.slice(0, 300); if (label) meta.linkLabel = label.slice(0, 30); }

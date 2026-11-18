@@ -81,7 +81,7 @@
             ".validate": "newData.val() == 'solo' || newData.val() == 'bell'"
           },
           "seats": {
-            ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 40"
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 40"
           },
           "nshow": {
             ".validate": "newData.isBoolean()"
