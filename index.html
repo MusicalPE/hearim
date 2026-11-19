@@ -151,8 +151,10 @@
   .opt.multi.on .dot { background: var(--brand); }
   .opt.multi.on .dot::after { content: ''; position: absolute; left: 50%; top: 45%; width: 6px; height: 11px; margin: -6px 0 0 -3px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); background: none; border-radius: 0; }
   .top-r { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-  .helpbtn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 8px 6px; font: inherit; font-size: 15px; font-weight: 700; color: var(--ink); cursor: pointer; }
-  .helpbtn .q { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 14px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; }
+  .helpbtn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 8px 6px; font: inherit; font-size: 15px; font-weight: 700; line-height: 1; color: var(--ink); cursor: pointer; }
+  .helpbtn .t { display: inline-block; line-height: 22px; height: 22px; transform: translateY(-2px); }
+  .helpbtn .q { transform: translateY(2px); }
+  .helpbtn .q { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 14px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; line-height: 1; flex: 0 0 22px; }
   .helpbtn:hover { text-decoration: underline; }
   #sheet { position: fixed; inset: 0; z-index: 50; background: rgba(17, 24, 39, .55); display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
   #sheet[hidden] { display: none; }
@@ -244,7 +246,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '2.3.0';
+const VERSION = '2.3.1';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -925,7 +927,7 @@ function armed(btn, text, run){
 /* ================= 첫 화면 · 만들기 ================= */
 function pageHome(){
   document.body.classList.add('home');
-  app.innerHTML = '<div class="top">' + logo + '<div class="top-r"><button type="button" class="helpbtn" id="hinst" hidden>앱으로 설치</button><button type="button" class="helpbtn" id="hhelp"><span class="q" aria-hidden="true">?</span>사용 안내</button></div></div><div class="home-grid">' +
+  app.innerHTML = '<div class="top">' + logo + '<div class="top-r"><button type="button" class="helpbtn" id="hinst" hidden><span class="t">앱으로 설치</span></button><button type="button" class="helpbtn" id="hhelp"><span class="q" aria-hidden="true">?</span><span class="t">사용 안내</span></button></div></div><div class="home-grid">' +
     '<div class="card h-join"><h1>여러분의 생각, 듣고 있어요</h1><p class="hint" style="margin:0 0 14px">QR을 찍고 고르면 결과가 바로 화면에 올라와요. 참여하는 사람은 가입도 설치도 필요 없어요.</p>' +
     '<label class="f" for="hc" style="margin-top:0">설문 번호로 참여하기</label><div class="row"><input type="text" id="hc" class="code" inputmode="latin" autocapitalize="none" autocomplete="off" maxlength="6" placeholder="예: k7m2pq" style="flex:1; min-width:0; text-transform:lowercase"><button type="button" class="btn main" id="hg">들어가기</button></div><div id="hm"></div></div>' +
     '<div class="card h-make" id="mk"><h2>설문 만들기</h2><p class="hint">연결하는 중…</p></div>' +
