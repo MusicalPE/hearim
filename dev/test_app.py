@@ -483,7 +483,7 @@ try:
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%M); d.click(); d.click(); t.wait_for_timeout(900)
     # ===== 사용 안내 · 설문 수 상한 =====
     t.reload(); t.wait_for_timeout(900)
-    t.fill('#mq','좋아하는 운동을 모두 골라 주세요'); t.locator('#mo input').nth(0).fill('달리기'); t.locator('#mo input').nth(1).fill('줄넘기'); t.click('#ma'); t.locator('#mo input').nth(2).fill('피구'); t.check('.q-ml')
+    t.fill('#mq','좋아하는 운동을 모두 골라 주세요'); t.locator('#mo input').nth(0).fill('달리기'); t.locator('#mo input').nth(1).fill('줄넘기'); t.click('#ma'); t.locator('#mo input').nth(2).fill('피구'); x5=t.locator('.q-mlx').is_hidden(); t.check('.q-ml'); x5=x5 and t.locator('.q-mlx').is_visible()
     t.click('#tb1'); x0=not t.locator('.q-mlw').first.is_visible(); t.click('#tb0'); x0=x0 and t.locator('.q-mlw').first.is_visible()
     t.click('#mc'); t.wait_for_timeout(1200); MU=t.locator('.poll').first.get_attribute('data-code')
     C=b.new_context(viewport={'width':390,'height':800}); setup(C); mp=C.new_page(); mp.on('pageerror',lambda e: errs.append(str(e))); mp.goto(APP+'?p='+MU); mp.wait_for_timeout(600)
@@ -501,6 +501,15 @@ try:
     try: dbput('polls/%s/votes/zzzzzzzzzzzz1'%MU,{'m':[0,'x'],'at':{'.sv':'timestamp'}})
     except Exception as e: r401=getattr(e,'code',0)
     mb.close(); C.close(); C2.close(); check('여러 개 고르기: 숫자가 아닌 답은 규칙이 막음', r401==401)
+    # 고를 수 있는 개수 제한 (2개까지)
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%MU).click(); t.wait_for_timeout(700); y0=t.locator('.q-ml').is_checked() and t.input_value('.q-mlx')=='0' and t.locator('.q-mlx').is_visible()
+    t.select_option('.q-mlx','2'); t.click('#mc'); t.wait_for_timeout(1000); y1=dbget('polls/%s/meta/max'%MU)==2 and dbget('polls/%s/meta/multi'%MU) is True
+    C3=b.new_context(viewport={'width':390,'height':800}); setup(C3); m3=C3.new_page(); m3.on('pageerror',lambda e: errs.append(str(e))); m3.goto(APP+'?p='+MU); m3.wait_for_timeout(600)
+    y2='2개까지 골라' in m3.inner_text('#jc'); m3.locator('.opt').nth(0).click(); m3.locator('.opt').nth(1).click(); m3.locator('.opt').nth(2).click()
+    y3=m3.locator('.opt.on').count()==2 and '2개까지 고를 수 있어요' in m3.inner_text('#jm'); m3.locator('.opt').nth(0).click(); m3.locator('.opt').nth(2).click(); y3=y3 and m3.locator('.opt.on').count()==2 and m3.inner_text('#jm')==''
+    m3.click('#js'); m3.wait_for_timeout(700); y4='줄넘기, 피구' in m3.inner_text('#jc')
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%MU).click(); t.wait_for_timeout(700); y5=t.input_value('.q-mlx')=='2'; t.click('#mx'); C3.close()
+    check('여러 개 고르기 개수 제한: 켜면 개수 고르기가 나옴 · 2개까지로 저장 · 참여자는 3개째를 못 고르고 안내 · 고치기에 그대로', x5 and y0 and y1 and y2 and y3 and y4 and y5, '%s %s %s %s %s %s %s'%(x5,y0,y1,y2,y3,y4,y5))
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%MU); d.click(); d.click(); t.wait_for_timeout(1000)
     t.click('#hhelp'); t.wait_for_timeout(300); h1=t.locator('#sheet .sheet').is_visible() and '골든벨' in t.inner_text('#sheet') and '홈 화면에 추가' in t.inner_text('#sheet') and '100개까지' in t.inner_text('#sheet') and t.locator('#sheet section').count()==7
     t.keyboard.press('Escape'); t.wait_for_timeout(200); h2=t.locator('#sheet').is_hidden(); t.click('#hhelp'); t.locator('#sheet .btn.main').click(); h3=t.locator('#sheet').is_hidden()
