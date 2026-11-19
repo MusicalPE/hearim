@@ -1,0 +1,16 @@
+{
+  "name": "헤아림 HearI'm",
+  "short_name": "헤아림",
+  "description": "QR을 찍고 고르면 결과가 바로 큰 화면에 올라오는 실시간 설문·퀴즈",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F4EF",
+  "theme_color": "#0F8B8D",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -315,6 +315,10 @@ try:
     qb.click('#bsh'); qb.wait_for_timeout(400); e5=qb.locator('table.qt').count()==0; qb.click('#bx'); qb.wait_for_timeout(300)
     check('번호별 결과: 만든 사람만 · 발표 모드로 가면 표가 사라짐', e4 and e5)
     s1.goto(APP+'?p='+Q1); s1.wait_for_timeout(800); e6=s1.locator('.seat').count()==0 and '고마워요' in s1.inner_text('#jc') and '3번' not in '' 
+    t.reload(); t.wait_for_timeout(900); t.locator('.poll[data-code="%s"] [data-act=edit]'%Q1).click(); t.wait_for_timeout(800)
+    t.locator('#qs .qb').nth(1).locator('.q-up').click(); t.click('#mc'); t.wait_for_timeout(1200)
+    check('번호로 들어온 학생이 있으면 첫 문제는 못 바꿈 (순서 그대로)', '첫 문제를 바꿀 수 없어요' in t.inner_text('#mm') and sibs(Q1)==[Q1,Q2] and dbget('seats/%s'%Q1) is not None, t.inner_text('#mm')[:80])
+    t.click('#mx'); t.wait_for_timeout(200)
     armed_rs=qb.locator('#brs'); armed_rs.click(); armed_rs.click(); qb.wait_for_timeout(1500)
     s1.goto(APP+'?p='+Q1); s1.wait_for_timeout(800)
     check('같은 기기로 다시 오면 번호를 다시 고르지 않음 · 퀴즈 처음부터: 번호·답·결과가 모두 지워지고 다시 번호 고르기', e6 and dbget('seats/%s'%Q1) is None and getc('skeys/'+Q1,'__admin') is None and getc('scores/'+Q1,'__admin') is None and dbget('polls/%s/votes'%Q1) is None and dbget('polls/%s/votes'%Q2) is None and s1.locator('.seat').count()==5 and s1.locator('.seat:disabled').count()==0)
@@ -379,6 +383,13 @@ try:
     qn(2).locator('.q-o input').nth(1).fill('아니오'); t.click('#mc'); t.wait_for_timeout(1600)
     M1=t.locator('.poll').first.get_attribute('data-code'); ms=sibs(M1); mm=[dbget('polls/%s/meta'%c) for c in ms]
     check('여러 질문을 한 번에 만들기: 질문 더하기 · 질문마다 모자란 곳 안내 · 저장하면 번호 셋이 묶음으로', n0 and n1 and n2 and len(ms)==3 and ms[0]==M1 and [m['q'] for m in mm]==['하나째','둘째','셋째'] and mm[1].get('type')=='text' and mm[1].get('max')==2 and all(sibs(c)==ms for c in ms) and all(m.get('flow')=='self' and m['open'] is True for m in mm) and '3개가 한 묶음' in t.inner_text('#mm') and t.locator('#qs .qb').count()==1 and t.input_value('#mq')=='' and '외 2개' in t.inner_text('.poll[data-code="%s"]'%M1))
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%M1).click(); t.wait_for_timeout(700)
+    r0=qn(0).locator('.q-up').is_disabled() and qn(2).locator('.q-dn').is_disabled() and qn(1).locator('.q-up').is_visible()
+    qn(2).locator('.q-up').click(); t.wait_for_timeout(100); r1=qn(1).locator('.q-q').input_value()=='셋째' and qn(2).locator('.q-q').input_value()=='둘째' and qn(2).locator('.q-t1').is_checked()
+    qn(1).locator('.q-up').click(); t.wait_for_timeout(100); r2=[qn(i).locator('.q-q').input_value() for i in range(3)]==['셋째','하나째','둘째'] and t.input_value('#mq')=='셋째'
+    t.click('#mc'); t.wait_for_timeout(1600); ms2=sibs(ms[2])
+    check('질문 순서 바꾸기: 위로·아래로(맨 위·맨 아래는 잠김) · 저장하면 묶음 순서와 카드 첫 질문이 바뀜 · 번호·내용은 그대로', r0 and r1 and r2 and ms2==[ms[2],ms[0],ms[1]] and all(sibs(c)==ms2 for c in ms) and t.locator('.poll[data-code="%s"]'%ms[2]).count()==1 and dbget('polls/%s/meta/q'%ms[2])=='셋째' and dbget('polls/%s/meta/type'%ms[1])=='text', str(ms2))
+    M1=ms[2]; ms=ms2
     ob=t.locator('.poll[data-code="%s"] [data-act=open]'%M1); ob.click(); t.wait_for_timeout(900); n3=all(dbget('polls/%s/meta/open'%c) is False for c in ms) and '마감' in t.inner_text('.poll[data-code="%s"] .tag'%M1)
     t.locator('.poll[data-code="%s"] [data-act=open]'%M1).click(); t.wait_for_timeout(900); n4=all(dbget('polls/%s/meta/open'%c) is True for c in ms)
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%M1); d.click(); d.click(); t.wait_for_timeout(1500)
@@ -471,7 +482,30 @@ try:
     check('확인한 뒤 띄우기: 발표 모드에서는 목록이 안 보임 · 고치기로 끌 수 있음', e16 and e17 and dbget('polls/%s/meta/mod'%M) is None and len(hl(M))>=3)
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%M); d.click(); d.click(); t.wait_for_timeout(900)
     # ===== 사용 안내 · 설문 수 상한 =====
-    t.locator('details.guide summary').click(); check('첫 화면 사용 안내', '100개까지' in t.inner_text('details.guide') and '구글 로그인' in t.inner_text('details.guide'))
+    t.reload(); t.wait_for_timeout(900)
+    t.fill('#mq','좋아하는 운동을 모두 골라 주세요'); t.locator('#mo input').nth(0).fill('달리기'); t.locator('#mo input').nth(1).fill('줄넘기'); t.click('#ma'); t.locator('#mo input').nth(2).fill('피구'); t.check('.q-ml')
+    t.click('#tb1'); x0=not t.locator('.q-mlw').first.is_visible(); t.click('#tb0'); x0=x0 and t.locator('.q-mlw').first.is_visible()
+    t.click('#mc'); t.wait_for_timeout(1200); MU=t.locator('.poll').first.get_attribute('data-code')
+    C=b.new_context(viewport={'width':390,'height':800}); setup(C); mp=C.new_page(); mp.on('pageerror',lambda e: errs.append(str(e))); mp.goto(APP+'?p='+MU); mp.wait_for_timeout(600)
+    x1='여러 개를 골라도' in mp.inner_text('#jc') and mp.locator('.opt.multi').count()==3 and mp.is_disabled('#js')
+    mp.locator('.opt').nth(0).click(); mp.locator('.opt').nth(2).click(); mp.locator('.opt').nth(1).click(); mp.locator('.opt').nth(1).click(); x2=mp.locator('.opt.on').count()==2 and not mp.is_disabled('#js')
+    mp.fill('#jt','둘 다 좋아요'); mp.click('#js'); mp.wait_for_timeout(700); x3='달리기, 피구' in mp.inner_text('#jc')
+    mv=dbget('polls/%s/votes'%MU); mv=list(mv.values())[0]; mm_=mv['m']; mm_=list(mm_.values()) if isinstance(mm_,dict) else mm_
+    mp.click('#jch'); mp.wait_for_timeout(300); x4=mp.locator('.opt.on').count()==2; mp.locator('.opt').nth(0).click(); mp.click('#js'); mp.wait_for_timeout(700); x4=x4 and '고른 답: 피구' in mp.inner_text('#jc').replace('\n',' ')
+    C2=b.new_context(viewport={'width':390,'height':800}); setup(C2); m2=C2.new_page(); m2.goto(APP+'?p='+MU); m2.wait_for_timeout(600); m2.locator('.opt').nth(1).click(); m2.locator('.opt').nth(2).click(); m2.click('#js'); m2.wait_for_timeout(700)
+    mb=T.new_page(); mb.on('pageerror',lambda e: errs.append(str(e))); mb.goto(APP+'?b='+MU+'&g=bar'); mb.wait_for_timeout(1200)
+    labs=[x.inner_text().replace('\n',' ') for x in mb.locator('.bar .lab').all()]
+    check('여러 개 고르기: 만들 때 켜기(퀴즈에는 없음) · 참여자는 여러 개를 켜고 끔 · 고른 답 모두 저장 · 답 바꾸기에 그대로', x0 and x1 and x2 and x3 and x4 and mm_==[0,2] and dbget('polls/%s/meta/multi'%MU) is True, '%s %s %s %s %s %s'%(x0,x1,x2,x3,x4,mm_))
+    check('여러 개 고르기 결과: 답한 사람 2명 · 보기마다 고른 사람 수와 % · 한 줄 의견에 고른 보기들', '2' in mb.inner_text('.b-count') and '여러 개 고르기' in mb.inner_text('.b-count') and labs[0].endswith('0명 · 0%') and labs[1].endswith('1명 · 50%') and labs[2].endswith('2명 · 100%') and '피구' in mb.inner_text('.b-cmts'), str(labs))
+    r401=0
+    try: dbput('polls/%s/votes/zzzzzzzzzzzz1'%MU,{'m':[0,'x'],'at':{'.sv':'timestamp'}})
+    except Exception as e: r401=getattr(e,'code',0)
+    mb.close(); C.close(); C2.close(); check('여러 개 고르기: 숫자가 아닌 답은 규칙이 막음', r401==401)
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%MU); d.click(); d.click(); t.wait_for_timeout(1000)
+    t.click('#hhelp'); t.wait_for_timeout(300); h1=t.locator('#sheet .sheet').is_visible() and '골든벨' in t.inner_text('#sheet') and '홈 화면에 추가' in t.inner_text('#sheet') and '100개까지' in t.inner_text('#sheet') and t.locator('#sheet section').count()==7
+    t.keyboard.press('Escape'); t.wait_for_timeout(200); h2=t.locator('#sheet').is_hidden(); t.click('#hhelp'); t.locator('#sheet .btn.main').click(); h3=t.locator('#sheet').is_hidden()
+    man=json.loads(urllib.request.urlopen(APP.rsplit('/',1)[0]+'/manifest.webmanifest').read()); swok=urllib.request.urlopen(APP.rsplit('/',1)[0]+'/sw.js').status==200
+    check('사용 안내: 오른쪽 위 단추로 열고 Esc·확인으로 닫힘 · 앱 설치용 manifest·아이콘·서비스 워커 있음', h1 and h2 and h3 and t.locator('link[rel=manifest]').count()==1 and man['short_name']=='헤아림' and man['display']=='standalone' and any(i['sizes']=='512x512' for i in man['icons']) and swok and t.locator('#hinst').is_hidden())
     for i in range(100):
         c='zz%04d'%i; dbput('polls/%s/meta'%c,{'owner':'teacher1','q':'상한 시험 %d'%i,'opts':['가','나'],'open':True,'ask':False,'res':True,'at':1000+i},'teacher1'); dbput('users/teacher1/polls/%s'%c,1000+i,'teacher1')
     t.reload(); t.wait_for_timeout(5000); n0=len(dbget('users/teacher1/polls?auth=teacher1'.replace('?auth=teacher1','')) or {}) if False else t.locator('.poll').count()
