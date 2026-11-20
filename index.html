@@ -277,6 +277,7 @@
 <body>
 <div class="wrap" id="app"><p class="empty">불러오는 중…</p></div>
 <script src="config.js"></script>
+<script src="demo.js"></script>
 <script src="qrcode.js"></script>
 <script>
 /* 헤아림 HearI'm — 실시간 설문
@@ -284,7 +285,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '2.5.0';
+const VERSION = '2.6.0';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -297,12 +298,16 @@ const CODE_RE = /^[a-z0-9]{6}$/;
 const ALPHA = 'abcdefghjkmnpqrstuvwxyz23456789';   // 헷갈리는 글자(i·l·o·0·1) 뺌
 const rnd = function(len, set){ const a = new Uint32Array(len); crypto.getRandomValues(a); let s = ''; for (let i = 0; i < len; i++) s += set[a[i] % set.length]; return s; };
 const BASE = location.origin + location.pathname;
-const joinUrl = function(code){ return BASE + '?p=' + code; };
-const boardUrl = function(code){ return BASE + '?b=' + code; };
-const reportUrl = function(code){ return BASE + '?r=' + code; };
-const ls = { get: function(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function(k, v){ try { localStorage.setItem(k, v); } catch (e) {} } };
+// 미리보기(?demo, demo.js): 지어낸 설문으로 둘러보기 — 주소마다 demo 를 이어 붙이고, 기기 저장 칸도 따로 씀
+const DEMO = window.HEARIM_DEMO || null;
+const DQ = DEMO ? 'demo&' : '', HOME = BASE + (DEMO ? '?demo' : '');
+const joinUrl = function(code){ return BASE + '?' + DQ + 'p=' + code; };
+const boardUrl = function(code){ return BASE + '?' + DQ + 'b=' + code; };
+const reportUrl = function(code){ return BASE + '?' + DQ + 'r=' + code; };
+const LSP = DEMO ? DEMO.prefix : '';
+const ls = { get: function(k){ try { return localStorage.getItem(LSP + k); } catch (e) { return null; } }, set: function(k, v){ try { localStorage.setItem(LSP + k, v); } catch (e) {} } };
 const optsOf = function(meta){ const o = meta && meta.opts; if (!o) return []; return (Array.isArray(o) ? o : Object.keys(o).sort().map(function(k){ return o[k]; })).filter(function(x){ return x != null; }); };
-const logo = '<a class="logo" href="' + esc(BASE) + '"><img src="icon.svg" alt="" width="64" height="64">헤아림<small>Hear<b>I&#39;m</b></small></a>';
+const logo = '<a class="logo" href="' + esc(HOME) + '"><img src="icon.svg" alt="" width="64" height="64">헤아림<small>Hear<b>I&#39;m</b></small></a>';
 
 /* ---- 주소로 바로 읽고 쓰기 (참여 화면) ---- */
 function rest(path, opt){
@@ -493,6 +498,7 @@ function qrSvg(text){
 let fbReady = null;
 function loadFb(){
   if (fbReady) return fbReady;
+  if (DEMO) { fbReady = Promise.resolve(DEMO.firebase); return fbReady; }
   const add = function(name){ return new Promise(function(ok, no){ const s = document.createElement('script'); s.src = FB_SDK + '/firebase-' + name + '-compat.js'; s.onload = ok; s.onerror = function(){ no(new Error('연결 도구를 불러오지 못했어요. 인터넷을 확인해 주세요.')); }; document.head.appendChild(s); }); };
   fbReady = add('app').then(function(){ return Promise.all([add('auth'), add('database')]); }).then(function(){ if (!firebase.apps.length) firebase.initializeApp(CFG); return firebase; });
   return fbReady;
@@ -729,7 +735,7 @@ function pageJoin(code){
     if (meta.res) resultBox();
   }
   rest('polls/' + code + '/meta').then(function(m){
-    if (!m || !m.q) { box.innerHTML = '<p class="msg bad">설문을 찾지 못했어요. 번호를 다시 확인해 주세요.</p><a class="btn" href="' + esc(BASE) + '">처음으로</a>'; return; }
+    if (!m || !m.q) { box.innerHTML = '<p class="msg bad">설문을 찾지 못했어요. 번호를 다시 확인해 주세요.</p><a class="btn" href="' + esc(HOME) + '">처음으로</a>'; return; }
     meta = m; document.title = '헤아림 · ' + m.q;
     const route = function(){ if (meta.open === false) closed(); else if (prev && canRedo()) mine().then(function(ok){ if (ok) done(); else { prev = null; ls.set(doneKey, ''); form(); } }); else if (prev) done(); else if (revOf(meta) >= 0) closed(); else form(); };
     if (qzOf(m) === 'bell') enter(bell); else if (qzOf(m)) enter(route); else route();
