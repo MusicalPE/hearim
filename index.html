@@ -246,7 +246,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '2.3.1';
+const VERSION = '2.4.0';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -600,6 +600,7 @@ function pageJoin(code){
     $('js').addEventListener('click', go); sync();
   }
   function form(){
+    onDone = false;
     if (isText(meta)) return formText();
     const opts = optsOf(meta), mu = !!meta.multi && !qzOf(meta), lim = limOf(), isOn = function(i){ return mu ? picks.indexOf(i) >= 0 : i === pick; };
     box.innerHTML = step() + '<p class="hint">' + (prev ? '이미 낸 답을 바꿀 수 있어요' : (mu ? (lim ? lim + '개까지 골라 주세요' : '여러 개를 골라도 돼요') : '하나를 골라 주세요')) + '</p><p class="q">' + esc(meta.q) + '</p>' +
@@ -637,6 +638,21 @@ function pageJoin(code){
           .catch(function(){ $('jm').innerHTML = '<p class="msg bad">보내지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.</p>'; });
       });
   }
+  // 만든 사람이 답을 지웠으면(이 기기의 답이 더는 없으면) 기억을 지우고 다시 고르게 함 — 번호로 푸는 퀴즈는 따로 처리
+  let onDone = false, gtm = 0;
+  const canRedo = function(){ return !seat && meta.open !== false && revOf(meta) < 0; };
+  const gone = function(){
+    onDone = false; clearTimeout(gtm); prev = null; pick = -1; picks = []; ls.set(doneKey, ''); form();
+    const m = $('jm'); if (m) m.innerHTML = '<p class="msg">선생님이 답을 지웠어요. 다시 골라 주세요.</p>';
+  };
+  const mine = function(){ return rest('polls/' + code + '/votes/' + vid).then(function(v){ return !!v; }).catch(function(){ return true; }); };
+  const watch = function(){
+    clearTimeout(gtm); if (seat) return;
+    gtm = setTimeout(function(){
+      if (!onDone) return; if (document.hidden) return watch();
+      mine().then(function(ok){ if (!onDone) return; if (!ok && canRedo()) gone(); else watch(); });
+    }, 8000);
+  };
   function resultBox(){
     const r = $('jr'); if (!r) return;
     r.innerHTML = '<p class="hint">결과를 불러오는 중…</p>';
@@ -644,6 +660,7 @@ function pageJoin(code){
     Promise.all([rest('polls/' + code + '/votes'), rest('polls/' + code + '/meta')]).then(function(a){
       const v = a[0], m = a[1];
       if (m && m.q) { const ch = revOf(m) !== revOf(meta) || (m.open === false) !== (meta.open === false); meta = m; if (ch) return prev && m.open !== false ? done() : closed(); }
+      if (prev && onDone && canRedo() && !(v && v[vid])) return gone();
       const t = isText(meta) ? tallyText(meta, v) : tally(meta, v);
       r.innerHTML = '<p class="hint" style="margin:0 0 10px">지금까지 <b>' + n(t.total) + '명</b></p>' + (isText(meta) ? cloudHtml(t) : barsHtml(t, revOf(meta))) + '<button type="button" class="btn sm" id="jre">결과 새로 보기</button>';
       $('jre').addEventListener('click', resultBox);
@@ -652,7 +669,7 @@ function pageJoin(code){
   const mark = function(){ const rv = revOf(meta); if (isText(meta) || rv < 0) return ''; const mine = prev && typeof prev.c === 'number'; return '<p class="msg">' + (mine ? (prev.c === rv ? '<b>맞았어요!</b> ' : '아쉬워요. ') : '') + '정답은 <b>' + esc(optsOf(meta)[rv] || '') + '</b>이에요.</p>'; };
   function done(){
     if (qzOf(meta) === 'bell' && seat) { bsig = ''; return bell(); }
-    const opts = optsOf(meta);
+    const opts = optsOf(meta); onDone = true; watch();
     box.innerHTML = who() + '<h1>고마워요!</h1><p class="hint" style="margin:0 0 14px">' + (isText(meta) ? '낸 답' : '고른 답') + ': <b style="color:var(--ink)">' + esc(isText(meta) ? (prev.a || []).join(', ') : labOf(prev)) + '</b></p>' + mark() +
       (qzOf(meta) === 'solo' ? '<div id="jq"></div>' : (meta.res ? '<div id="jr"></div>' : '<p class="msg">결과는 앞의 큰 화면에서 볼 수 있어요.</p>')) +
       '<div class="row" style="margin-top:16px">' + (meta.open !== false && revOf(meta) < 0 ? '<button type="button" class="btn sm" id="jch">답 바꾸기</button>' : '') +
@@ -662,6 +679,7 @@ function pageJoin(code){
     if ($('jch')) $('jch').addEventListener('click', function(){ if (typeof prev.c === 'number') pick = prev.c; picks = picksOf(prev, optsOf(meta).length); form(); });
   }
   function closed(){
+    onDone = false;
     if (qzOf(meta) === 'bell' && seat) { if (!prev && prev0) prev = prev0; bsig = ''; return bell(); }
     if (meta.wait) {
       box.innerHTML = step() + '<p class="q">' + esc(meta.q) + '</p><p class="msg">아직 열리지 않은 질문이에요. 선생님이 큰 화면에 이 질문을 띄우면 다시 눌러 주세요.</p><div class="row" style="margin-top:14px"><button type="button" class="btn main" id="jrl" style="flex:1">다시 확인하기</button></div>';
@@ -674,7 +692,7 @@ function pageJoin(code){
   rest('polls/' + code + '/meta').then(function(m){
     if (!m || !m.q) { box.innerHTML = '<p class="msg bad">설문을 찾지 못했어요. 번호를 다시 확인해 주세요.</p><a class="btn" href="' + esc(BASE) + '">처음으로</a>'; return; }
     meta = m; document.title = '헤아림 · ' + m.q;
-    const route = function(){ if (meta.open === false) closed(); else if (prev) done(); else if (revOf(meta) >= 0) closed(); else form(); };
+    const route = function(){ if (meta.open === false) closed(); else if (prev && canRedo()) mine().then(function(ok){ if (ok) done(); else { prev = null; ls.set(doneKey, ''); form(); } }); else if (prev) done(); else if (revOf(meta) >= 0) closed(); else form(); };
     if (qzOf(m) === 'bell') enter(bell); else if (qzOf(m)) enter(route); else route();
   }).catch(function(){ box.innerHTML = '<p class="msg bad">불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요.</p>'; });
 }

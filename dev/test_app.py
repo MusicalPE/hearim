@@ -134,6 +134,19 @@ try:
     t.locator('.poll [data-act=open]').first.click(); t.wait_for_timeout(600); check('다시 받기', dbget('polls/%s/meta/open'%code) is True and '받는 중' in t.inner_text('.poll'))
     bd.wait_for_timeout(600); bd.click('#bcl'); check('답 지우기는 한 번 더 눌러야', '한 번 더' in bd.inner_text('#bcl') and len(dbget('polls/%s/votes'%code))==6)
     bd.click('#bcl'); bd.wait_for_timeout(800); check('답 지우기 → 0명', dbget('polls/%s/votes'%code) is None and '0' in bd.inner_text('.b-count'))
+    # 만든 사람이 답을 지우면 참여자는 다시 고를 수 있음 (보고 있던 화면은 스스로, 다시 연 화면은 바로)
+    RC=b.new_context(viewport={'width':390,'height':800}); setup(RC); r1=RC.new_page(); r1.on('pageerror',lambda e: errs.append(str(e)))
+    RC2=b.new_context(viewport={'width':390,'height':800}); setup(RC2); r2=RC2.new_page()
+    for pg in (r1,r2):
+        pg.goto(APP+'?p='+code); pg.wait_for_timeout(600); pg.locator('.opt').nth(1).click(); pg.click('#js'); pg.wait_for_timeout(700)
+    w0='고마워요' in r1.inner_text('#jc') and len(dbget('polls/%s/votes'%code))==2
+    bd.click('#bcl'); bd.wait_for_timeout(500); bd.click('#bcl'); bd.wait_for_timeout(800)
+    r2.reload(); r2.wait_for_timeout(1000); w1=r2.locator('.opt').count()>=2 and r2.locator('.opt.on').count()==0 and '고마워요' not in r2.inner_text('#jc')
+    r1.wait_for_timeout(9500); w2=r1.locator('.opt').count()>=2 and '선생님이 답을 지웠어요' in r1.inner_text('#jc')
+    r1.locator('.opt').nth(2).click(); r1.click('#js'); r1.wait_for_timeout(700); w3='고마워요' in r1.inner_text('#jc') and len(dbget('polls/%s/votes'%code))==1
+    r1.reload(); r1.wait_for_timeout(1000); w4='고마워요' in r1.inner_text('#jc')
+    check('답 지우기 뒤 참여자: 보던 화면은 스스로 다시 고르기로 · 새로 열면 바로 고르기 · 다시 내면 저장 · 답이 있으면 그대로 고마워요', w0 and w1 and w2 and w3 and w4, '%s %s %s %s %s | %s'%(w0,w1,w2,w3,w4,r2.inner_text('#jc')[:80].replace('\n',' ')))
+    RC.close(); RC2.close(); bd.click('#bcl'); bd.wait_for_timeout(500); bd.click('#bcl'); bd.wait_for_timeout(800)
     t.locator('.poll [data-act=del]').first.click(); t.locator('.poll [data-act=del]').first.click(); t.wait_for_timeout(900)
     check('설문 지우기', dbget('polls/%s'%code) is None and '아직 만든 설문이 없어요' in t.inner_text('#my'))
     # ===== 적어서 내기 (답 구름) =====
