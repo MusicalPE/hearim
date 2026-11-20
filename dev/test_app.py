@@ -24,7 +24,7 @@ try:
   with sync_playwright() as p:
     b=p.chromium.launch()
     T=b.new_context(viewport={'width':1100,'height':900}); setup(T); T.grant_permissions(['clipboard-read','clipboard-write'],origin='http://127.0.0.1:8930')
-    t=T.new_page(); errs=[]; t.on('pageerror',lambda e: errs.append(str(e)))
+    t=T.new_page(); errs=[]; t.on('pageerror',lambda e: errs.append(str(e))); dlg=[]; t.on('dialog',lambda d: (dlg.append(d.type), d.accept()))
     t.goto(APP); t.wait_for_timeout(600)
     check('첫 화면: 번호로 참여 · 만들기는 로그인 먼저', t.locator('#hc').count()==1 and t.locator('#lg').count()==1)
     t.fill('#hc','ab'); t.click('#hg'); check('잘못된 번호 안내', '6자리' in t.inner_text('#hm'))
@@ -403,7 +403,21 @@ try:
     t.click('#qpaste'); t.fill('#qpt','바라는 점 (적어서 내기)\n\n다음 가운데 공은?\n- 축구공 (정답)\n- 연필'); t.click('#qpgo'); t.wait_for_timeout(200); p3=t.locator('#qs .qb').count()==3 and qn(2).locator('.q-ans').input_value()=='0' and '1개는 넣지 못했어요' in t.inner_text('#mm')
     t.click('#qpaste'); t.fill('#qpt','   '); t.click('#qpgo'); t.wait_for_timeout(200); p4='질문을 찾지 못했어요' in t.inner_text('#qpm')
     check('붙여 넣어 만들기(퀴즈): 정답 줄·(정답) 표시로 정답이 골라지고 퀴즈로 바뀜 · 적은 질문 뒤에 이어 붙음 · 빈 글은 안내', p2 and p3 and p4, '%s %s %s'%(p2,p3,p4))
-    t.click('#qpx')
+    ex0=t.locator('.qp-ex > div').count()==2; t.click('[data-ex="0"]'); ex1=t.input_value('#qpt').startswith('1. 좋아하는 운동은?')
+    t.click('#qpx'); t.wait_for_timeout(200)
+    t.reload(); t.wait_for_timeout(800); t.click('#qpaste'); t.click('[data-ex="1"]'); t.click('#qpgo'); t.wait_for_timeout(300)
+    ex2='퀴즈' in t.inner_text('#mh') and t.locator('#qs .qb').count()==2 and t.input_value('#mans')=='0' and t.locator('#qs .qb').nth(1).locator('.q-ans').input_value()=='1'
+    t.reload(); t.wait_for_timeout(800); t.click('#qpaste'); t.click('[data-ex="0"]'); t.click('#qpgo'); t.wait_for_timeout(300)
+    ex3=t.locator('#qs .qb').count()==3 and t.locator('#qs .qb').nth(1).locator('.q-ml').is_checked() and t.locator('#qs .qb').nth(2).locator('.q-t1').is_checked()
+    check('붙여 넣기 예시: 설문·퀴즈 두 칸 · 넣어 보기로 글 칸이 채워지고 그대로 만들어짐', ex0 and ex1 and ex2 and ex3, '%s %s %s %s'%(ex0,ex1,ex2,ex3))
+    del dlg[:]; t.reload(); t.wait_for_timeout(800); u1='beforeunload' in dlg
+    del dlg[:]; t.reload(); t.wait_for_timeout(800); u2='beforeunload' not in dlg
+    t.fill('#mq','적다가 지움'); t.fill('#mq',''); del dlg[:]; t.reload(); t.wait_for_timeout(800); u3='beforeunload' not in dlg
+    t.fill('#mq','저장할 질문'); t.locator('#mo input').nth(0).fill('가'); t.locator('#mo input').nth(1).fill('나'); t.click('#mc'); t.wait_for_timeout(1200); U1=t.locator('.poll').first.get_attribute('data-code')
+    del dlg[:]; t.reload(); t.wait_for_timeout(800); u4='beforeunload' not in dlg
+    t.locator('.poll[data-code="%s"] [data-act=edit]'%U1).click(); t.wait_for_timeout(600); t.fill('#mq','저장할 질문 고침'); del dlg[:]; t.click('#mx'); t.wait_for_timeout(200); u5='confirm' in dlg and t.input_value('#mq')==''
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%U1); d.click(); d.click(); t.wait_for_timeout(1000)
+    check('저장 안 한 글: 적은 채로 새로고침·뒤로가기하면 물어봄 · 빈 칸이나 저장한 뒤에는 묻지 않음 · 고치다 그만두기도 물어봄', u1 and u2 and u3 and u4 and u5, '%s %s %s %s %s'%(u1,u2,u3,u4,u5))
     # ===== 한 칸에서 여러 질문을 한 번에 만들기 =====
     t.reload(); t.wait_for_timeout(800); qn=lambda i: t.locator('#qs .qb').nth(i)
     n0=t.locator('#qs .qb').count()==1 and not qn(0).locator('.q-del').is_visible() and not t.locator('#mfw').is_visible()

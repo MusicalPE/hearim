@@ -204,6 +204,11 @@
     .rp-g { grid-template-columns: 1fr 1fr; }
     .rp-g.one { grid-template-columns: 1fr; }
   }
+  .qp-ex { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .qp-ex > div { border: 1px dashed #C9CFD6; border-radius: 10px; padding: 8px 10px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .qp-h { font-size: 14px; }
+  .qp-ex .btn { margin-top: auto; width: 100%; justify-content: center; padding-top: 6px; padding-bottom: 6px; min-height: 0; font-size: 13px; }
+  .qp-ex pre { margin: 0; font: inherit; font-size: 13px; line-height: 1.5; color: var(--ink-2); white-space: pre-wrap; word-break: keep-all; }
   .qadd { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 12px; padding: 18px 12px; border: 2px dashed #C9CFD6; border-radius: 14px; background: transparent; color: var(--brand-dark); font: inherit; font-weight: 800; cursor: pointer; transition: background .15s, border-color .15s; }
   .qadd:hover, .qadd:focus-visible { background: #EAF6F3; border-color: var(--brand); }
   .qadd:disabled { opacity: .45; cursor: default; background: transparent; border-color: #C9CFD6; }
@@ -285,7 +290,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '2.7.0';
+const VERSION = '2.8.0';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -1015,7 +1020,15 @@ function pageHome(){
   }
   // ===== 만들기 칸: 질문을 한 칸 안에서 여러 개 이어 만듦 =====
   // 저장은 질문마다 설문 하나(번호 하나)로 하고, 둘 이상이면 묶음(sib)으로 이어 결과 화면에서 쪽을 넘기며 봄
-  let kind = 'poll', eset = null, Qb = [], quid = 0;
+  let kind = 'poll', eset = null, Qb = [], quid = 0, dirty = false;
+  // 저장하지 않은 글이 있는지: 고치는 중이면 무엇이든 바꿨을 때, 새로 만드는 중이면 질문이나 보기를 적었을 때
+  const unsaved = function(){
+    if (!dirty || !$('qs')) return false;
+    if (eset) return true;
+    return Qb.some(function(b){ const g = b.get(); return g.q || g.opts.length; }) || !!($('qpt') && $('qpt').value.trim());
+  };
+  const okToLeave = function(){ return !unsaved() || confirm('저장하지 않은 질문이 있어요. 그래도 나갈까요?'); };
+  window.addEventListener('beforeunload', function(e){ if (unsaved()) { e.preventDefault(); e.returnValue = ''; return ''; } });
   function addQ(d){
     d = d || {}; const id = ++quid, el = document.createElement('div'); el.className = 'qb';
     const locked = d.votes > 0 && d.type !== 'text' ? (d.opts || []).length : 0;
@@ -1093,8 +1106,8 @@ function pageHome(){
     mk.innerHTML = '<div class="row" style="justify-content:space-between; margin-bottom:6px"><h2 style="margin:0" id="mh">설문 만들기</h2><button type="button" class="btn sm" id="lo">로그아웃</button></div>' +
       '<div class="tabs" role="tablist" aria-label="만들 것 고르기"><button type="button" role="tab" class="tab on" id="tb0" aria-selected="true">설문 만들기</button><button type="button" role="tab" class="tab" id="tb1" aria-selected="false">퀴즈 만들기</button></div><div id="me"></div>' +
       '<div class="row" style="margin:12px 0 0"><button type="button" class="btn sm" id="qpaste" aria-expanded="false">붙여 넣어 만들기</button><span class="hint">적어 둔 질문을 한꺼번에 넣어요</span></div>' +
-      '<div id="qpw" class="qb" hidden><label class="f" for="qpt" style="margin-top:0">질문과 보기를 붙여 넣어 주세요</label><textarea id="qpt" rows="9" placeholder="1. 선생님은 어떤 역할로 써 보셨나요? (고르기)&#10;- 체육 선생님&#10;- 담임 선생님&#10;- 교과·기타 선생님&#10;&#10;2. 좋았던 점을 모두 골라 주세요 (여러 개, 2개까지)&#10;- 쉬워요&#10;- 빨라요&#10;- 예뻐요&#10;&#10;3. 바라는 점을 적어 주세요 (적어서 내기)"></textarea>' +
-      '<p class="hint" style="margin:8px 0 0">질문은 번호로, 보기는 - 나 ① 같은 표시로 시작해 주세요. 질문 끝에 (여러 개) (2개까지) (적어서 내기) (OX)를 붙이면 그대로 만들어요. 보기가 없는 질문은 적어서 내기가 돼요. 퀴즈는 정답 보기 끝에 (정답)을 붙이거나 아래 줄에 정답: 2 처럼 적어 주세요.</p>' +
+      '<div id="qpw" class="qb" hidden><label class="f" for="qpt" style="margin-top:0">질문과 보기를 붙여 넣어 주세요</label><textarea id="qpt" rows="8" placeholder="여기에 붙여 넣어 주세요"></textarea>' +
+      '<div class="qp-ex"><div><b class="qp-h">설문 예시</b><pre>1. 좋아하는 운동은?\n- 축구\n- 피구\n\n2. 좋은 점을 모두 (여러 개)\n- 쉬워요\n- 빨라요\n\n3. 바라는 점 (적어서 내기)</pre><button type="button" class="btn sm" data-ex="0">이 예시 넣기</button></div><div><b class="qp-h">퀴즈 예시</b><pre>1. 줄넘기는 유산소 운동이다 (OX)\n정답: O\n\n2. 준비 운동을 하는 까닭은?\n- 땀을 내려고\n- 다치지 않으려고 (정답)</pre><button type="button" class="btn sm" data-ex="1">이 예시 넣기</button></div></div>' +
       '<div class="row" style="margin-top:10px"><button type="button" class="btn main sm" id="qpgo">질문 만들기</button><button type="button" class="btn sm" id="qpx">그만두기</button></div><div id="qpm"></div></div><div id="qs"></div>' +
       '<button type="button" class="qadd" id="qadd"><span class="qadd-i" aria-hidden="true"></span><span>질문 더하기</span></button><p class="hint" id="qcnt" style="margin:8px 0 0; text-align:center"></p>' +
       '<div id="mfw" hidden><label class="f" for="mfl">다음 질문으로 넘어가는 방식</label><select id="mfl" style="max-width:100%"><option value="self">답을 내면 스스로 다음 질문으로</option><option value="with">선생님이 쪽을 넘기면 그 QR을 다시 찍기</option></select><p class="hint" style="margin:8px 0 0">선생님과 함께로 하면 뒤 질문은 닫혀 있다가, 결과 화면에서 그 쪽으로 넘길 때 열려요. 앞 질문은 계속 열려 있어요.</p></div>' +
@@ -1110,7 +1123,7 @@ function pageHome(){
       reset: function(){
         eset = null; Qb = []; $('qs').innerHTML = ''; $('me').innerHTML = '';
         $('mfl').value = 'self'; $('mqz').value = ''; $('mns').value = '1'; $('msn').value = '30'; $('mres').checked = true; $('ml').value = ''; $('mll').value = '';
-        addQ(); update();
+        addQ(); update(); dirty = false;
       },
       // 만든 설문(묶음이면 질문 전체)을 같은 칸에 채워 넣고 고침
       fill: function(codes, by){
@@ -1126,6 +1139,7 @@ function pageHome(){
           if (has && kind !== 'quiz') { kind = 'quiz'; $('mqz').value = qzOf(m0); update(); }
           ks.forEach(function(v, i){ if (v && typeof v.a === 'number' && Qb[i] && Qb[i].code === codes[i]) Qb[i].setAns(v.a); });
         });
+        dirty = false;
         if (mk.scrollIntoView) mk.scrollIntoView({ block: 'start' }); $('mq').focus();
       }
     };
@@ -1133,6 +1147,7 @@ function pageHome(){
     // 붙여 넣어 만들기: 적어 둔 글을 질문 칸으로 바꿈. 비어 있는 칸은 채우고, 이미 적은 질문 뒤에 이어 붙임
     const qpOpen = function(on){ $('qpw').hidden = !on; $('qpaste').setAttribute('aria-expanded', on); if (on) $('qpt').focus(); };
     $('qpaste').addEventListener('click', function(){ qpOpen($('qpw').hidden); });
+    $('qpw').querySelectorAll('[data-ex]').forEach(function(b){ b.addEventListener('click', function(){ $('qpt').value = b.parentNode.querySelector('pre').textContent; dirty = true; $('qpt').focus(); }); });
     $('qpx').addEventListener('click', function(){ qpOpen(false); $('qpm').innerHTML = ''; });
     $('qpgo').addEventListener('click', function(){
       const r = parsePaste($('qpt').value), msg = function(t, bad){ $('qpm').innerHTML = '<p class="msg' + (bad ? ' bad' : '') + '">' + t + '</p>'; };
@@ -1151,15 +1166,16 @@ function pageHome(){
         added++;
       });
       if (!Qb.length) addQ();
-      update(); $('qpt').value = '';
+      update(); $('qpt').value = ''; dirty = true;
       qpOpen(false);
       $('mm').innerHTML = '<p class="msg">질문 ' + added + '개를 채웠어요.' + (hasAns ? ' 정답이 있어 퀴즈로 만들어요.' : '') + (skip.length ? ' ' + skip.length + '개는 넣지 못했어요(' + (qk ? '퀴즈에는 적어서 내기가 없거나 ' : '') + '질문은 10개까지).' : '') + (r.cut ? ' 보기가 6개를 넘는 질문은 6개까지만 넣었어요.' : '') + ' 확인한 뒤 저장해 주세요.</p>';
       if (Qb[0] && Qb[0].el.scrollIntoView) Qb[0].el.scrollIntoView({ block: 'start' });
     });
     $('qadd').addEventListener('click', function(){ if (Qb.length >= 10) return; const b = addQ(); update(); b.el.querySelector('.q-q').focus(); });
     $('mqz').addEventListener('change', update);
-    $('mx').addEventListener('click', function(){ form.reset(); $('mm').innerHTML = ''; });
-    $('lo').addEventListener('click', function(){ fb.auth().signOut(); });
+    $('mx').addEventListener('click', function(){ if (!okToLeave()) return; form.reset(); $('mm').innerHTML = ''; });
+    $('lo').addEventListener('click', function(){ if (okToLeave()) { dirty = false; fb.auth().signOut(); } });
+    mk.addEventListener('input', function(){ dirty = true; }); mk.addEventListener('change', function(){ dirty = true; });
     $('mc').addEventListener('click', create);
     form.reset(); list();
   }
@@ -1257,7 +1273,7 @@ function pageHome(){
         my.querySelectorAll('.poll').forEach(function(el){
           const g = groups[Number(el.dataset.g)], code = g.codes[0], anyOpen = g.codes.some(function(c){ return by[c].meta.open !== false; });
           el.querySelector('[data-act=copy]').addEventListener('click', function(e){ const b = e.currentTarget, ok2 = function(){ b.textContent = '복사했어요'; setTimeout(function(){ b.textContent = '참여 주소 복사'; }, 1500); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(joinUrl(code)).then(ok2, function(){ prompt('참여 주소', joinUrl(code)); }); else prompt('참여 주소', joinUrl(code)); });
-          el.querySelector('[data-act=edit]').addEventListener('click', function(){ form.fill(g.codes, by); });
+          el.querySelector('[data-act=edit]').addEventListener('click', function(){ if (okToLeave()) form.fill(g.codes, by); });
           // 마감: 열려 있는 질문을 모두 닫음. 다시 받기: 대기 중인 질문만 빼고 엶
           el.querySelector('[data-act=open]').addEventListener('click', function(){
             Promise.all(g.codes.filter(function(c){ const x = by[c].meta; return anyOpen ? x.open !== false : !x.wait; }).map(function(c){ return db.ref('polls/' + c + '/meta/open').set(!anyOpen); })).then(function(){ list(); });
