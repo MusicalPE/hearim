@@ -285,7 +285,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '2.6.0';
+const VERSION = '2.7.0';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -941,7 +941,7 @@ function pageBoard(code){
 /* ---- 사용 안내 ---- */
 const HELP = [
   ['처음 쓰는 분께', ['설문을 만들려면 구글 로그인이 필요해요. 참여하는 사람은 QR이나 설문 번호만 있으면 돼요.', '이름이나 연락처는 받지 않아요. 번호를 아는 사람은 누구나 답할 수 있어요.', '무료 공간을 함께 쓰는 앱이에요. 한 사람이 ' + MAX_POLLS + '개까지 만들 수 있으니, 다 쓴 설문은 지워 주세요.']],
-  ['설문 만들기', ['질문을 적고 하나 고르기나 적어서 내기를 골라요. 보기는 2~6개예요.', '여러 개 고를 수 있게를 켜면 참여자가 보기를 여러 개 골라요. 2개까지처럼 고를 수 있는 개수를 정할 수도 있어요.', '질문 더하기로 10개까지 한 번에 만들고, 위로·아래로로 순서를 바꿔요.', '만든 뒤에도 내가 만든 설문의 고치기로 질문을 고치거나 더하고 뺄 수 있어요.']],
+  ['설문 만들기', ['질문을 적고 하나 고르기나 적어서 내기를 골라요. 보기는 2~6개예요.', '여러 개 고를 수 있게를 켜면 참여자가 보기를 여러 개 골라요. 2개까지처럼 고를 수 있는 개수를 정할 수도 있어요.', '질문 더하기로 10개까지 한 번에 만들고, 위로·아래로로 순서를 바꿔요.', '적어 둔 질문이 있으면 붙여 넣어 만들기에 한꺼번에 붙여 넣어요. 질문은 1. 2. 번호로, 보기는 - 나 ①로 시작하면 돼요.', '만든 뒤에도 내가 만든 설문의 고치기로 질문을 고치거나 더하고 뺄 수 있어요.']],
   ['결과 화면 띄우기', ['내가 만든 설문의 결과 화면 열기를 눌러 큰 화면에 띄우고 QR을 보여 주세요.', '그래프 단추나 G 글쇠로 가로 막대, 세로 막대, 원 그래프를 바꿔요.', '발표 모드는 질문·QR·결과만 크게 보여 줘요. 주소를 그대로 발표 자료에 넣어도 돼요.', '질문이 여러 개면 이전·다음, 화살표 글쇠, 발표용 리모컨으로 쪽을 넘겨요.', '화면에 띄우지 않고 결과만 받고 싶으면 결과지를 눌러요. 질문 전체가 한 장에 모이고, 인쇄하거나 PDF로 저장할 수 있어요.']],
   ['적어서 내기', ['같은 답이 모이면 글씨가 커지고, 새 답은 빈 곳에 나타나요.', '거친 말은 걸러 두지만 다 걸러지지는 않아요. 결과 화면에서 글자를 누르면 숨겨요.', '확인한 뒤 띄우기를 켜면 내가 띄운 답만 큰 화면에 나와요.']],
   ['퀴즈', ['퀴즈 만들기에서 문제마다 정답을 골라요. 정답은 만든 사람만 볼 수 있어요.', '함께 풀기: 답을 받은 뒤 결과 화면의 정답 보이기(A 글쇠)를 누르면 정답과 정답률이 떠요.', '혼자 풀기: 학생이 번호를 골라 끝까지 풀고, 결과 알려 주기를 누르면 맞은 개수를 각자 확인해요. 큰 화면에는 분포만 나와요.', '번호를 잘못 고른 학생은 번호별 결과에서 그 번호만 풀어 줄 수 있어요.']],
@@ -1091,7 +1091,11 @@ function pageHome(){
   }
   function maker(){
     mk.innerHTML = '<div class="row" style="justify-content:space-between; margin-bottom:6px"><h2 style="margin:0" id="mh">설문 만들기</h2><button type="button" class="btn sm" id="lo">로그아웃</button></div>' +
-      '<div class="tabs" role="tablist" aria-label="만들 것 고르기"><button type="button" role="tab" class="tab on" id="tb0" aria-selected="true">설문 만들기</button><button type="button" role="tab" class="tab" id="tb1" aria-selected="false">퀴즈 만들기</button></div><div id="me"></div><div id="qs"></div>' +
+      '<div class="tabs" role="tablist" aria-label="만들 것 고르기"><button type="button" role="tab" class="tab on" id="tb0" aria-selected="true">설문 만들기</button><button type="button" role="tab" class="tab" id="tb1" aria-selected="false">퀴즈 만들기</button></div><div id="me"></div>' +
+      '<div class="row" style="margin:12px 0 0"><button type="button" class="btn sm" id="qpaste" aria-expanded="false">붙여 넣어 만들기</button><span class="hint">적어 둔 질문을 한꺼번에 넣어요</span></div>' +
+      '<div id="qpw" class="qb" hidden><label class="f" for="qpt" style="margin-top:0">질문과 보기를 붙여 넣어 주세요</label><textarea id="qpt" rows="9" placeholder="1. 선생님은 어떤 역할로 써 보셨나요? (고르기)&#10;- 체육 선생님&#10;- 담임 선생님&#10;- 교과·기타 선생님&#10;&#10;2. 좋았던 점을 모두 골라 주세요 (여러 개, 2개까지)&#10;- 쉬워요&#10;- 빨라요&#10;- 예뻐요&#10;&#10;3. 바라는 점을 적어 주세요 (적어서 내기)"></textarea>' +
+      '<p class="hint" style="margin:8px 0 0">질문은 번호로, 보기는 - 나 ① 같은 표시로 시작해 주세요. 질문 끝에 (여러 개) (2개까지) (적어서 내기) (OX)를 붙이면 그대로 만들어요. 보기가 없는 질문은 적어서 내기가 돼요. 퀴즈는 정답 보기 끝에 (정답)을 붙이거나 아래 줄에 정답: 2 처럼 적어 주세요.</p>' +
+      '<div class="row" style="margin-top:10px"><button type="button" class="btn main sm" id="qpgo">질문 만들기</button><button type="button" class="btn sm" id="qpx">그만두기</button></div><div id="qpm"></div></div><div id="qs"></div>' +
       '<button type="button" class="qadd" id="qadd"><span class="qadd-i" aria-hidden="true"></span><span>질문 더하기</span></button><p class="hint" id="qcnt" style="margin:8px 0 0; text-align:center"></p>' +
       '<div id="mfw" hidden><label class="f" for="mfl">다음 질문으로 넘어가는 방식</label><select id="mfl" style="max-width:100%"><option value="self">답을 내면 스스로 다음 질문으로</option><option value="with">선생님이 쪽을 넘기면 그 QR을 다시 찍기</option></select><p class="hint" style="margin:8px 0 0">선생님과 함께로 하면 뒤 질문은 닫혀 있다가, 결과 화면에서 그 쪽으로 넘길 때 열려요. 앞 질문은 계속 열려 있어요.</p></div>' +
       '<div id="mqzw"><label class="f" for="mqz">푸는 방식</label><select id="mqz" style="max-width:100%"><option value="">함께 풀기 (번호 없이 · 선생님이 정답을 보여 줘요)</option><option value="solo">혼자 풀기 (번호로 들어와 끝까지 풀고, 맞은 개수를 각자 확인)</option><option value="bell">골든벨 (번호로 들어와 선생님과 한 문제씩, 틀리면 탈락)</option></select></div>' +
@@ -1126,6 +1130,32 @@ function pageHome(){
       }
     };
     $('tb0').addEventListener('click', function(){ kind = 'poll'; update(); }); $('tb1').addEventListener('click', function(){ kind = 'quiz'; update(); });
+    // 붙여 넣어 만들기: 적어 둔 글을 질문 칸으로 바꿈. 비어 있는 칸은 채우고, 이미 적은 질문 뒤에 이어 붙임
+    const qpOpen = function(on){ $('qpw').hidden = !on; $('qpaste').setAttribute('aria-expanded', on); if (on) $('qpt').focus(); };
+    $('qpaste').addEventListener('click', function(){ qpOpen($('qpw').hidden); });
+    $('qpx').addEventListener('click', function(){ qpOpen(false); $('qpm').innerHTML = ''; });
+    $('qpgo').addEventListener('click', function(){
+      const r = parsePaste($('qpt').value), msg = function(t, bad){ $('qpm').innerHTML = '<p class="msg' + (bad ? ' bad' : '') + '">' + t + '</p>'; };
+      if (!r.qs.length) return msg('질문을 찾지 못했어요. 질문 앞에 1. 2. 처럼 번호를 붙여 주세요.', true);
+      const hasAns = r.qs.some(function(q){ return q.ans >= 0; });
+      if (hasAns && kind !== 'quiz') kind = 'quiz';
+      const qk = kind === 'quiz', skip = [];
+      // 아무것도 안 적은 칸은 지우고 그 자리에 넣음
+      Qb.slice().forEach(function(b){ const g = b.get(); if (!b.code && !g.q && !g.opts.length) { Qb.splice(Qb.indexOf(b), 1); b.el.remove(); } });
+      let added = 0;
+      r.qs.forEach(function(q){
+        if (Qb.length >= 10) { skip.push(q.q); return; }
+        if (qk && q.text) { skip.push(q.q); return; }
+        const b = addQ({ q: q.q, type: q.text ? 'text' : 'pick', opts: q.opts, multi: !qk && q.multi, mlx: q.mlx, max: q.text ? q.max : 1 });
+        if (q.ans >= 0) b.setAns(q.ans);
+        added++;
+      });
+      if (!Qb.length) addQ();
+      update(); $('qpt').value = '';
+      qpOpen(false);
+      $('mm').innerHTML = '<p class="msg">질문 ' + added + '개를 채웠어요.' + (hasAns ? ' 정답이 있어 퀴즈로 만들어요.' : '') + (skip.length ? ' ' + skip.length + '개는 넣지 못했어요(' + (qk ? '퀴즈에는 적어서 내기가 없거나 ' : '') + '질문은 10개까지).' : '') + (r.cut ? ' 보기가 6개를 넘는 질문은 6개까지만 넣었어요.' : '') + ' 확인한 뒤 저장해 주세요.</p>';
+      if (Qb[0] && Qb[0].el.scrollIntoView) Qb[0].el.scrollIntoView({ block: 'start' });
+    });
     $('qadd').addEventListener('click', function(){ if (Qb.length >= 10) return; const b = addQ(); update(); b.el.querySelector('.q-q').focus(); });
     $('mqz').addEventListener('change', update);
     $('mx').addEventListener('click', function(){ form.reset(); $('mm').innerHTML = ''; });
@@ -1272,6 +1302,71 @@ function pageHome(){
     const text = '﻿' + ['때', '고른 보기', '한 줄 의견'].map(q).join(',') + '\n' + rows.join('\n') + '\n';
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' })); a.download = '헤아림_' + code + '.csv'; document.body.appendChild(a); a.click(); a.remove();
   }
+}
+
+/* ---- 붙여 넣어 만들기: 글 → 질문 목록 ---- */
+// 질문: "1." "1번" "Q1" "문제 1." 로 시작하는 줄(또는 빈 줄 다음의 첫 줄). 보기: - • · * ① 1) 가. a) 로 시작하는 줄
+// 질문 끝 꼬리표: (고르기) (여러 개) (2개까지) (적어서 내기)/(주관식) (OX) · 정답: 보기 끝 (정답) 또는 "정답: 2 / 정답: 보기글 / 정답: O"
+function parsePaste(txt){
+  const qs = []; let cur = null, gap = false, cut = false;
+  const QN = /^(?:Q|q|문제|질문)?\s*(\d{1,2})\s*(?:[.:번]|\.\)|\))\s*(.+)$/;
+  const QDOT = /^(?:Q|q|문제|질문)?\s*\d{1,2}\s*[.:번]\s*\S/;
+  const OPT = /^(?:[-–—•·*▪◦○●□■☐✓✔]|[①②③④⑤⑥⑦⑧⑨⑩]|\(?[1-9]\s*\)|[가나다라마바]\s*[.)]|[a-fA-F]\s*[.)])\s*(.+)$/;
+  const ANS = /^(?:정답|답)\s*[:：]?\s*(.+)$/;
+  const close = function(){ if (!cur) return; qs.push(cur); cur = null; };
+  const QPRE = /^(?:Q|q|문제|질문)\s*(\d{1,2})\s*[.:)번]?\s+(.+)$/, PAREN = /^\(?(\d{1,2})\s*\)\s*(.+)$/;
+  let qno = 0;
+  const start = function(t, no){ close(); cur = { q: t, opts: [], ans: -1, ansText: '', paren: 0 }; qno = no || (qno + 1); };
+  String(txt || '').replace(/\r/g, '').split('\n').forEach(function(raw){
+    const l = raw.replace(/\u00a0/g, ' ').trim();
+    if (!l) { gap = true; return; }
+    let m;
+    if (cur && (m = l.match(ANS))) { cur.ansText = m[1].trim(); gap = false; return; }
+    // 번호+점(1.)이면 늘 새 질문, 1) 은 질문 안에서는 보기
+    if ((m = l.match(QPRE))) { start(m[2].trim(), Number(m[1])); gap = false; return; }
+    if (QDOT.test(l) || (!cur && (m = l.match(QN)))) { m = l.match(QN); start(m ? m[2].trim() : l, m ? Number(m[1]) : 0); gap = false; return; }
+    // 4) 처럼 괄호 번호: 보기 번호가 이어지면 보기, 다음 질문 번호와 맞으면 새 질문
+    if (cur && (m = l.match(PAREN))) {
+      const k = Number(m[1]);
+      if (k === cur.paren + 1 && !(k === qno + 1 && cur.paren === 0 && cur.opts.length)) { cur.paren = k; cur.opts.push(m[2].trim()); }
+      else if (k === qno + 1) start(m[2].trim(), k);
+      else cur.opts.push(m[2].trim());
+      gap = false; return;
+    }
+    if (cur && (m = l.match(OPT))) { cur.opts.push(m[1].trim()); gap = false; return; }
+    if (!cur || gap) { start(l); gap = false; return; }
+    cur.opts.push(l); gap = false;
+  });
+  close();
+  return { qs: qs.map(function(x){
+    let q = x.q, text = false, multi = false, mlx = 0, ox = false, max = 1;
+    const tag = function(re){ const m = q.match(re); if (m) q = q.replace(re, ' ').replace(/\s{2,}/g, ' ').trim(); return m; };
+    let m;
+    if (tag(/[(\[]\s*(?:적어서\s*내기|주관식|서술형?|단답형?)\s*[)\]]/)) text = true;
+    if ((m = tag(/[(\[]\s*(?:여러\s*개|복수|중복)[^)\]]*?(\d)\s*개\s*까지[^)\]]*[)\]]/))) { multi = true; mlx = Number(m[1]); }
+    if ((m = tag(/[(\[]\s*(\d)\s*개\s*까지[^)\]]*[)\]]/))) { multi = true; mlx = Number(m[1]); if (text) { max = mlx; multi = false; mlx = 0; } }
+    if (tag(/[(\[]\s*(?:여러\s*개|복수|중복)(?:\s*(?:고르기|선택|응답))?\s*[)\]]/)) multi = true;
+    if (tag(/[(\[]\s*(?:OX|ox|O\s*\/\s*X)\s*[)\]]/)) ox = true;
+    tag(/[(\[]\s*(?:하나\s*)?(?:고르기|객관식|선택)\s*[)\]]/);
+    let opts = x.opts.slice(), ans = -1;
+    opts = opts.map(function(o, i){
+      const r = o.replace(/\s*(?:[(\[]\s*정답\s*[)\]]|[✓✔]|\*)\s*$/, '');
+      if (r !== o && ans < 0) ans = i;
+      return r.trim();
+    }).filter(function(o, i){ if (!o && ans === i) ans = -1; return !!o; });
+    if (ox && !opts.length) opts = ['O', 'X'];
+    if (!opts.length) text = true;
+    if (text) { opts = []; multi = false; mlx = 0; max = Math.min(5, Math.max(1, max)); }
+    if (opts.length > 6) { opts = opts.slice(0, 6); cut = true; if (ans > 5) ans = -1; }
+    if (!text && x.ansText && ans < 0) {
+      const a = x.ansText.replace(/[.)번]\s*$/, '').trim(), num = '①②③④⑤⑥'.indexOf(a.charAt(0));
+      if (/^\d+$/.test(a) && Number(a) >= 1 && Number(a) <= opts.length) ans = Number(a) - 1;
+      else if (num >= 0 && num < opts.length) ans = num;
+      else { const k = opts.findIndex(function(o){ return o.replace(/\s/g, '').toLowerCase() === a.replace(/\s/g, '').toLowerCase(); }); if (k >= 0) ans = k; }
+    }
+    if (mlx < 2) mlx = 0;
+    return { q: q.slice(0, 200), opts: opts.map(function(o){ return o.slice(0, 60); }), text: text, multi: multi && !text, mlx: Math.min(5, mlx), max: max, ans: text ? -1 : ans };
+  }).filter(function(x){ return x.q; }), cut: cut };
 }
 
 /* ================= 결과지 (한 장짜리 · 인쇄 / PDF) ================= */

@@ -389,6 +389,21 @@ try:
     check('골든벨: 퀴즈 처음부터(번호·결과 지우고 뒤 문제 다시 대기, 아이는 번호부터) · 고치기에 그대로 채워짐 · 남은 사람 수만 보여 주기', g8 and g9 and g10 and g11 and bsum['a']==0 and bsum['k']==1 and 'ns' not in bsum and '남은 사람 0' in gb.inner_text('.b-alive').replace('\n',' ') and gb.locator('.b-seats').count()==0 and '탈락했어요' in jc(b1), '%s %s %s %s %s'%(g8,g9,g10,g11,bsum))
     for x in (b1,b2,b3): x.context.close()
     gb.close(); d=t.locator('.poll[data-code="%s"] [data-act=del]'%G1); d.click(); d.click(); t.wait_for_timeout(1500)
+    # ===== 붙여 넣어 만들기 =====
+    t.reload(); t.wait_for_timeout(800); qn=lambda i: t.locator('#qs .qb').nth(i)
+    p0=t.locator('#qpw').is_hidden(); t.click('#qpaste'); p0=p0 and t.locator('#qpt').is_visible()
+    t.fill('#qpt','1. 선생님은 어떤 역할로 써 보셨나요? (고르기)\n   - 체육 선생님(관리자)\n   - 체육 선생님\n   - 담임 선생님\n   - 교과·기타 선생님\n\n2. 좋았던 점을 모두 골라 주세요 (여러 개, 2개까지)\n① 쉬워요\n② 빨라요\n③ 예뻐요\n3. 바라는 점을 적어 주세요 (적어서 내기)')
+    t.click('#qpgo'); t.wait_for_timeout(300)
+    p1=t.locator('#qs .qb').count()==3 and t.input_value('#mq')=='선생님은 어떤 역할로 써 보셨나요?' and t.locator('#mo input').count()==4 and t.locator('#mo input').nth(0).input_value()=='체육 선생님(관리자)' and qn(1).locator('.q-ml').is_checked() and qn(1).locator('.q-mlx').input_value()=='2' and qn(2).locator('.q-t1').is_checked() and '질문 3개를 채웠어요' in t.inner_text('#mm') and t.locator('#qpw').is_hidden()
+    t.click('#mc'); t.wait_for_timeout(1600); P1=t.locator('.poll').first.get_attribute('data-code'); ps=sibs(P1); pm=[dbget('polls/%s/meta'%c) for c in ps]
+    check('붙여 넣어 만들기(설문): 번호 질문 · - 와 ① 보기 · (여러 개, 2개까지) · (적어서 내기) → 질문 3개 묶음으로 저장', p0 and p1 and len(ps)==3 and pm[1].get('multi') is True and pm[1].get('max')==2 and pm[2].get('type')=='text' and len(pm[0]['opts'])==4, '%s %s'%(p0,p1))
+    d=t.locator('.poll[data-code="%s"] [data-act=del]'%P1); d.click(); d.click(); t.wait_for_timeout(1200)
+    t.click('#qpaste'); t.fill('#qpt','1. 줄넘기는 유산소 운동이다 (OX)\n정답: O\n2. 준비 운동을 하는 까닭은?\n1) 땀을 내려고\n2) 다치지 않으려고 (정답)\n3) 시간을 채우려고'); t.click('#qpgo'); t.wait_for_timeout(300)
+    p2='퀴즈' in t.inner_text('#mh') and t.locator('#qs .qb').count()==2 and t.input_value('#mans')=='0' and qn(1).locator('.q-ans').input_value()=='1' and qn(1).locator('.q-o input').count()==3 and '퀴즈로 만들어요' in t.inner_text('#mm')
+    t.click('#qpaste'); t.fill('#qpt','바라는 점 (적어서 내기)\n\n다음 가운데 공은?\n- 축구공 (정답)\n- 연필'); t.click('#qpgo'); t.wait_for_timeout(200); p3=t.locator('#qs .qb').count()==3 and qn(2).locator('.q-ans').input_value()=='0' and '1개는 넣지 못했어요' in t.inner_text('#mm')
+    t.click('#qpaste'); t.fill('#qpt','   '); t.click('#qpgo'); t.wait_for_timeout(200); p4='질문을 찾지 못했어요' in t.inner_text('#qpm')
+    check('붙여 넣어 만들기(퀴즈): 정답 줄·(정답) 표시로 정답이 골라지고 퀴즈로 바뀜 · 적은 질문 뒤에 이어 붙음 · 빈 글은 안내', p2 and p3 and p4, '%s %s %s'%(p2,p3,p4))
+    t.click('#qpx')
     # ===== 한 칸에서 여러 질문을 한 번에 만들기 =====
     t.reload(); t.wait_for_timeout(800); qn=lambda i: t.locator('#qs .qb').nth(i)
     n0=t.locator('#qs .qb').count()==1 and not qn(0).locator('.q-del').is_visible() and not t.locator('#mfw').is_visible()
