@@ -166,6 +166,44 @@
   .sheet ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
   .sheet li { font-size: 15px; line-height: 1.55; color: var(--ink-2); }
   @media (min-width: 900px) { #sheet { justify-content: center; } .sheet { border-radius: 18px; } }
+  /* ---- 결과지 (한 장으로 인쇄) ---- */
+  body.rp { background: #E9E6DF; }
+  .rp-bar { max-width: 760px; margin: 16px auto 0; padding: 0 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .rp-bar .hint { flex: 1 1 220px; margin: 0; }
+  .sheet-pg { width: 718px; margin: 12px auto 40px; background: #fff; padding: 28px 30px; box-sizing: content-box; box-shadow: 0 2px 14px rgba(0,0,0,.12); color: #1F2933; }
+  .rp-h { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1F2933; padding-bottom: 8px; }
+  .rp-h .lg { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 17px; }
+  .rp-h .lg img { width: 26px; height: 26px; border-radius: 7px; }
+  .rp-h .dt { font-size: 12px; color: #4B5563; }
+  .rp-t { margin: 12px 0 2px; font-size: 21px; font-weight: 900; line-height: 1.35; }
+  .rp-s { margin: 0 0 12px; font-size: 12.5px; color: #4B5563; }
+  .rp-g { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; align-items: start; }
+  .rp-g.one { grid-template-columns: 1fr; }
+  .rq { break-inside: avoid; page-break-inside: avoid; border: 1px solid #D9D4CA; border-radius: 10px; padding: 10px 12px; }
+  .rq h3 { margin: 0 0 2px; font-size: 14.5px; line-height: 1.4; font-weight: 800; }
+  .rq .m { margin: 0 0 8px; font-size: 11.5px; color: #6B7280; }
+  .rr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; font-size: 12.5px; margin-bottom: 5px; }
+  .rr .l { overflow-wrap: anywhere; }
+  .rr .v { color: #374151; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rr .b { grid-column: 1 / -1; height: 7px; border-radius: 4px; background: #EEEBE5; overflow: hidden; }
+  .rr .b i { display: block; height: 100%; border-radius: 4px; background: #0F8B8D; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rr.ok .l { font-weight: 800; } .rr.ok .b i { background: #E0A100; }
+  .rr .ok-t { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 4px; background: #E0A100; color: #fff; font-size: 10.5px; font-weight: 800; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rw { display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: 12.5px; }
+  .rw span { border: 1px solid #D9D4CA; border-radius: 999px; padding: 1px 8px; }
+  .rw b { color: #0B6E70; margin-left: 3px; }
+  .rc { margin: 8px 0 0; padding: 0 0 0 16px; font-size: 11.5px; color: #374151; }
+  .rc li { margin-bottom: 2px; }
+  .rp-f { margin-top: 14px; border-top: 1px solid #D9D4CA; padding-top: 6px; font-size: 11px; color: #6B7280; display: flex; justify-content: space-between; }
+  @media (max-width: 800px) { .sheet-pg { width: auto; margin: 10px; padding: 18px 16px; } .rp-g { grid-template-columns: 1fr; } }
+  @page { size: A4; margin: 10mm; }
+  @media print {
+    body.rp { background: #fff; }
+    .rp-bar { display: none; }
+    .sheet-pg { width: auto; margin: 0; padding: 0; box-shadow: none; zoom: var(--z, 1); }
+    .rp-g { grid-template-columns: 1fr 1fr; }
+    .rp-g.one { grid-template-columns: 1fr; }
+  }
   .qadd { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 12px; padding: 18px 12px; border: 2px dashed #C9CFD6; border-radius: 14px; background: transparent; color: var(--brand-dark); font: inherit; font-weight: 800; cursor: pointer; transition: background .15s, border-color .15s; }
   .qadd:hover, .qadd:focus-visible { background: #EAF6F3; border-color: var(--brand); }
   .qadd:disabled { opacity: .45; cursor: default; background: transparent; border-color: #C9CFD6; }
@@ -246,7 +284,7 @@
    결과 화면: ?b=설문번호 (큰 화면용, 실시간)   ·   만들기: 첫 화면에서 구글 로그인
    자리: polls/{번호}/meta (질문·보기·열림), polls/{번호}/votes/{참여자 번호} = { c: 고른 보기, t: 한 줄 의견, at }
          users/{uid}/polls/{번호} = 만든 때 */
-const VERSION = '2.4.0';
+const VERSION = '2.5.0';
 const MAX_POLLS = 100;   // 한 사람이 만들어 둘 수 있는 설문 수 (무료 저장 공간을 함께 쓰므로)
 const CFG = window.HEARIM_CONFIG || null;
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1';
@@ -261,6 +299,7 @@ const rnd = function(len, set){ const a = new Uint32Array(len); crypto.getRandom
 const BASE = location.origin + location.pathname;
 const joinUrl = function(code){ return BASE + '?p=' + code; };
 const boardUrl = function(code){ return BASE + '?b=' + code; };
+const reportUrl = function(code){ return BASE + '?r=' + code; };
 const ls = { get: function(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function(k, v){ try { localStorage.setItem(k, v); } catch (e) {} } };
 const optsOf = function(meta){ const o = meta && meta.opts; if (!o) return []; return (Array.isArray(o) ? o : Object.keys(o).sort().map(function(k){ return o[k]; })).filter(function(x){ return x != null; }); };
 const logo = '<a class="logo" href="' + esc(BASE) + '"><img src="icon.svg" alt="" width="64" height="64">헤아림<small>Hear<b>I&#39;m</b></small></a>';
@@ -848,7 +887,7 @@ function pageBoard(code){
       (dist && qz ? '<button type="button" class="btn sm" id="bds">분포 보기</button>' : '') +
       (owner && qz === 'solo' ? '<button type="button" class="btn sm" id="bsc">결과 알려 주기</button>' : '') + (owner && qz ? '<button type="button" class="btn sm" id="btb">번호별 결과</button>' : '') +
       (owner ? (hasKey || rev >= 0 ? '<button type="button" class="btn sm' + (rev >= 0 ? ' on' : '') + '" id="bans">' + (rev >= 0 ? '정답 숨기기' : '정답 보이기') + '</button>' : '') + '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? (meta.wait ? '이 질문 열기' : '다시 받기') : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' + (qz ? '<button type="button" class="btn sm danger" id="brs">퀴즈 처음부터</button>' : '') : '') +
-      '<button type="button" class="btn sm" id="bsh">발표 모드</button><button type="button" class="btn sm" id="bfs">전체 화면</button>';
+      (owner ? '<a class="btn sm" id="brp" href="' + esc(reportUrl(code)) + '" target="_blank" rel="noopener">결과지</a>' : '') + '<button type="button" class="btn sm" id="bsh">발표 모드</button><button type="button" class="btn sm" id="bfs">전체 화면</button>';
     $('bsh').addEventListener('click', function(){ setShow(true); });
     if ($('bds')) $('bds').addEventListener('click', function(){ qview = 'dist'; draw(); });
     if ($('bsc')) $('bsc').addEventListener('click', publish);
@@ -878,7 +917,7 @@ function pageBoard(code){
     $('bw').classList.toggle('own', owner);
     cloudUpdate($('bw'), t, function(key){ if (!(uid && meta && meta.owner === uid)) return; db.ref('polls/' + code + '/meta/hide').set(hideOf(meta).concat([key]).slice(-300)); });
     $('bc').innerHTML = (owner ? (t.flagged.length ? '<button type="button" class="btn sm" id="bfb" aria-expanded="' + flOpen + '">' + (t.mod ? '확인할 답 ' : '걸러진 답 ') + t.flagged.length + '개</button>' : '') + (hn ? '<button type="button" class="btn sm" id="bun">숨긴 답 ' + hn + '개 되살리기</button>' : '') + '<button type="button" class="btn sm" id="bop">' + (meta.open === false ? (meta.wait ? '이 질문 열기' : '다시 받기') : '마감하기') + '</button><button type="button" class="btn sm danger" id="bcl">답 지우기</button>' : '') +
-      '<button type="button" class="btn sm" id="bsh">발표 모드</button><button type="button" class="btn sm" id="bfs">전체 화면</button>';
+      (owner ? '<a class="btn sm" id="brp" href="' + esc(reportUrl(code)) + '" target="_blank" rel="noopener">결과지</a>' : '') + '<button type="button" class="btn sm" id="bsh">발표 모드</button><button type="button" class="btn sm" id="bfs">전체 화면</button>';
     $('bsh').addEventListener('click', function(){ setShow(true); });
     $('bfs').addEventListener('click', function(){ const d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function(){}); });
     if ($('bfb')) $('bfb').addEventListener('click', function(){ flOpen = !flOpen; drawText(); });
@@ -897,7 +936,7 @@ function pageBoard(code){
 const HELP = [
   ['처음 쓰는 분께', ['설문을 만들려면 구글 로그인이 필요해요. 참여하는 사람은 QR이나 설문 번호만 있으면 돼요.', '이름이나 연락처는 받지 않아요. 번호를 아는 사람은 누구나 답할 수 있어요.', '무료 공간을 함께 쓰는 앱이에요. 한 사람이 ' + MAX_POLLS + '개까지 만들 수 있으니, 다 쓴 설문은 지워 주세요.']],
   ['설문 만들기', ['질문을 적고 하나 고르기나 적어서 내기를 골라요. 보기는 2~6개예요.', '여러 개 고를 수 있게를 켜면 참여자가 보기를 여러 개 골라요. 2개까지처럼 고를 수 있는 개수를 정할 수도 있어요.', '질문 더하기로 10개까지 한 번에 만들고, 위로·아래로로 순서를 바꿔요.', '만든 뒤에도 내가 만든 설문의 고치기로 질문을 고치거나 더하고 뺄 수 있어요.']],
-  ['결과 화면 띄우기', ['내가 만든 설문의 결과 화면 열기를 눌러 큰 화면에 띄우고 QR을 보여 주세요.', '그래프 단추나 G 글쇠로 가로 막대, 세로 막대, 원 그래프를 바꿔요.', '발표 모드는 질문·QR·결과만 크게 보여 줘요. 주소를 그대로 발표 자료에 넣어도 돼요.', '질문이 여러 개면 이전·다음, 화살표 글쇠, 발표용 리모컨으로 쪽을 넘겨요.']],
+  ['결과 화면 띄우기', ['내가 만든 설문의 결과 화면 열기를 눌러 큰 화면에 띄우고 QR을 보여 주세요.', '그래프 단추나 G 글쇠로 가로 막대, 세로 막대, 원 그래프를 바꿔요.', '발표 모드는 질문·QR·결과만 크게 보여 줘요. 주소를 그대로 발표 자료에 넣어도 돼요.', '질문이 여러 개면 이전·다음, 화살표 글쇠, 발표용 리모컨으로 쪽을 넘겨요.', '화면에 띄우지 않고 결과만 받고 싶으면 결과지를 눌러요. 질문 전체가 한 장에 모이고, 인쇄하거나 PDF로 저장할 수 있어요.']],
   ['적어서 내기', ['같은 답이 모이면 글씨가 커지고, 새 답은 빈 곳에 나타나요.', '거친 말은 걸러 두지만 다 걸러지지는 않아요. 결과 화면에서 글자를 누르면 숨겨요.', '확인한 뒤 띄우기를 켜면 내가 띄운 답만 큰 화면에 나와요.']],
   ['퀴즈', ['퀴즈 만들기에서 문제마다 정답을 골라요. 정답은 만든 사람만 볼 수 있어요.', '함께 풀기: 답을 받은 뒤 결과 화면의 정답 보이기(A 글쇠)를 누르면 정답과 정답률이 떠요.', '혼자 풀기: 학생이 번호를 골라 끝까지 풀고, 결과 알려 주기를 누르면 맞은 개수를 각자 확인해요. 큰 화면에는 분포만 나와요.', '번호를 잘못 고른 학생은 번호별 결과에서 그 번호만 풀어 줄 수 있어요.']],
   ['골든벨', ['푸는 방식에서 골든벨을 고르면 선생님과 한 문제씩 풀어요.', '정답을 보이면 틀린 학생은 탈락하고, 쪽을 넘기면 학생 화면도 다음 문제로 넘어가요.', '둘째 문제부터 부활 문제로 정하면 탈락한 학생만 풀고, 맞히면 다시 살아나요.', '퀴즈 처음부터를 누르면 번호와 결과를 지우고 1번 문제로 돌아가요.']],
@@ -1177,7 +1216,7 @@ function pageHome(){
           const c0 = g.codes[0], m = by[c0].meta, nq = g.codes.length, anyOpen = g.codes.some(function(c){ return by[c].meta.open !== false; }), most = Math.max.apply(null, g.codes.map(tot));
           return '<div class="poll" data-code="' + c0 + '" data-g="' + gi + '"' + (g.codes.indexOf(fresh) >= 0 ? ' style="border-color:var(--brand)"' : '') + '><h3>' + esc(m.q) + (nq > 1 ? ' <span class="hint" style="font-weight:600">외 ' + (nq - 1) + '개</span>' : '') + '</h3><p class="hint" style="margin:0 0 10px"><span class="tag' + (anyOpen ? '' : ' off') + '">' + (anyOpen ? '받는 중' : '마감') + '</span> 번호 <span class="code">' + c0 + '</span> · 답 ' + n(most) + '명' + (nq === 1 && isText(m) ? ' · 적어서 내기' : '') + (qzOf(m) === 'solo' ? ' · 퀴즈(혼자 풀기)' : qzOf(m) === 'bell' ? ' · 골든벨' : '') + (nq > 1 ? ' · <b>질문 ' + nq + '개</b>' : '') + '</p>' +
             (nq > 1 ? '<ol class="qlist">' + g.codes.map(function(c){ const x = by[c].meta; return '<li>' + esc(x.q) + ' <span class="hint">' + (qzOf(x) === 'bell' && x.rv ? '· 부활 문제 ' : '') + '· 답 ' + n(tot(c)) + '명' + (x.open === false ? (x.wait ? ' · 대기' : ' · 마감') : '') + '</span></li>'; }).join('') + '</ol>' : '') +
-            '<div class="row"><a class="btn main sm" href="' + esc(boardUrl(c0)) + '" target="_blank" rel="noopener">결과 화면 열기</a><button type="button" class="btn sm" data-act="copy">참여 주소 복사</button><button type="button" class="btn sm" data-act="edit">고치기</button><button type="button" class="btn sm" data-act="open">' + (anyOpen ? '마감하기' : '다시 받기') + '</button><button type="button" class="btn sm" data-act="csv">답 내려받기</button><button type="button" class="btn sm danger" data-act="del">지우기</button></div></div>';
+            '<div class="row"><a class="btn main sm" href="' + esc(boardUrl(c0)) + '" target="_blank" rel="noopener">결과 화면 열기</a><button type="button" class="btn sm" data-act="copy">참여 주소 복사</button><button type="button" class="btn sm" data-act="edit">고치기</button><button type="button" class="btn sm" data-act="open">' + (anyOpen ? '마감하기' : '다시 받기') + '</button><a class="btn sm" data-act="rep" href="' + esc(reportUrl(c0)) + '" target="_blank" rel="noopener">결과지</a><button type="button" class="btn sm" data-act="csv">답 내려받기</button><button type="button" class="btn sm danger" data-act="del">지우기</button></div></div>';
         }).join('') || '<p class="empty">아직 만든 설문이 없어요.</p>';
         my.querySelectorAll('.poll').forEach(function(el){
           const g = groups[Number(el.dataset.g)], code = g.codes[0], anyOpen = g.codes.some(function(c){ return by[c].meta.open !== false; });
@@ -1229,11 +1268,85 @@ function pageHome(){
   }
 }
 
+/* ================= 결과지 (한 장짜리 · 인쇄 / PDF) ================= */
+// 묶음 전체를 한 장에 모아 보여 줌. 답은 누구나 읽을 수 있는 자리에서 한 번만 읽고(실시간 연결 없음),
+// 정답은 공개됐거나(rev) 혼자 풀기 결과를 알려 준 것(scores/ans)만 쓰고, 만든 사람이 로그인해 있으면 정답 칸도 읽어 표시함
+function pageReport(code){
+  document.body.classList.add('rp'); document.title = '헤아림 · 결과지';
+  app.innerHTML = '<div class="rp-bar"><button type="button" class="btn main sm" id="rpp">인쇄 · PDF로 저장</button><label class="chk" style="margin:0"><input type="checkbox" id="rpf" checked><span>한 장에 맞추기</span></label><a class="btn sm" href="' + esc(boardUrl(code)) + '" target="_blank" rel="noopener">결과 화면</a><p class="hint">인쇄 창에서 "PDF로 저장"을 고르면 파일로 받아요.</p></div><div class="sheet-pg" id="rps"><p class="hint">결과를 불러오는 중…</p></div>';
+  let data = null, keys = {};
+  const fit = function(){
+    const el = $('rps'); if (!el) return; el.style.setProperty('--z', '1');
+    if (!$('rpf').checked) return;
+    // A4(여백 10mm)의 인쇄 칸: 190mm × 277mm ≈ 718 × 1047 px. 내용 높이를 재서 한 장에 들어가게 줄임(너무 작아지면 멈춤)
+    const w = 718, h = el.scrollHeight * (w / Math.max(1, el.clientWidth));
+    el.style.setProperty('--z', String(Math.max(.5, Math.min(1, 1040 / h))));
+  };
+  const render = function(){
+    const d = data, sb = d.sb, metas = d.metas, votes = d.votes;
+    let most = 0;
+    const blocks = sb.map(function(c, i){
+      const m = metas[i] || {}, tx = isText(m), qz = !!qzOf(m);
+      if (tx) {
+        const t = tallyText(m, votes[i]); most = Math.max(most, t.total);
+        const its = t.items.slice().sort(function(a, b){ return b.count - a.count; }), top = its.slice(0, 24);
+        return '<div class="rq"><h3>' + (i + 1) + '. ' + esc(m.q) + '</h3><p class="m">적어서 내기 · ' + n(t.total) + '명</p>' +
+          (top.length ? '<div class="rw">' + top.map(function(it){ return '<span>' + esc(it.label) + (it.count > 1 ? '<b>' + it.count + '</b>' : '') + '</span>'; }).join('') + '</div>' + (its.length > top.length ? '<p class="m" style="margin:6px 0 0">그 밖에 ' + (its.length - top.length) + '개</p>' : '') : '<p class="m">답이 없어요.</p>') + '</div>';
+      }
+      const t = tally(m, votes[i]); most = Math.max(most, t.total);
+      let ak = revOf(m); if (ak < 0 && typeof keys[c] === 'number') ak = keys[c]; if (ak < 0 && d.ans && typeof d.ans[i] === 'number' && d.ans[i] >= 0) ak = d.ans[i];
+      const kind = qz ? '퀴즈' : (m.multi ? '여러 개 고르기' + (Number(m.max) >= 2 ? '(' + Math.min(5, Number(m.max)) + '개까지)' : '') : '하나 고르기');
+      const okN = ak >= 0 ? t.counts[ak] || 0 : -1;
+      return '<div class="rq"><h3>' + (i + 1) + '. ' + esc(m.q) + '</h3><p class="m">' + kind + ' · ' + n(t.total) + '명' + (okN >= 0 && t.total ? ' · 정답률 ' + Math.round(okN / t.total * 100) + '%' : '') + '</p>' +
+        t.opts.map(function(o, k){ const c2 = t.counts[k], pct = t.total ? Math.round(c2 / t.total * 100) : 0; return '<div class="rr' + (k === ak ? ' ok' : '') + '"><span class="l">' + esc(o) + (k === ak ? '<span class="ok-t">정답</span>' : '') + '</span><span class="v">' + n(c2) + '명 · ' + pct + '%</span><span class="b"><i style="width:' + pct + '%"></i></span></div>'; }).join('') +
+        (t.cmts.length ? '<ul class="rc">' + t.cmts.slice(0, 6).map(function(x){ return '<li>' + esc(x.t) + '</li>'; }).join('') + (t.cmts.length > 6 ? '<li>그 밖에 ' + (t.cmts.length - 6) + '개</li>' : '') + '</ul>' : '') + '</div>';
+    });
+    let dist = '';
+    if (d.dist && listOf(d.dist.d).length) {
+      const dd = listOf(d.dist.d).map(Number), tot = dd.reduce(function(a, b){ return a + b; }, 0);
+      dist = '<div class="rq" style="margin-top:12px"><h3>맞은 개수별 사람 수</h3><p class="m">' + n(tot) + '명 · ' + (dd.length - 1) + '문제</p>' +
+        dd.map(function(c2, k){ const pct = tot ? Math.round(c2 / tot * 100) : 0; return '<div class="rr"><span class="l">' + k + '개</span><span class="v">' + n(c2) + '명 · ' + pct + '%</span><span class="b"><i style="width:' + pct + '%"></i></span></div>'; }).reverse().join('') + '</div>';
+    }
+    const m0 = metas[0] || {}, now = new Date();
+    $('rps').innerHTML = '<div class="rp-h"><span class="lg"><img src="icon.svg" alt="">헤아림 <small style="font-weight:600;color:#6B7280">결과지</small></span><span class="dt">' + esc(now.toLocaleString('ko-KR', { dateStyle: 'long', timeStyle: 'short' })) + ' 기준</span></div>' +
+      '<p class="rp-t">' + esc(m0.q || '') + (sb.length > 1 ? ' <span style="font-weight:600;color:#6B7280;font-size:.7em">외 ' + (sb.length - 1) + '개</span>' : '') + '</p>' +
+      '<p class="rp-s">설문 번호 ' + esc(sb[0]) + ' · 질문 ' + sb.length + '개 · 답한 사람 ' + n(most) + '명' + (qzOf(m0) === 'solo' ? ' · 혼자 풀기 퀴즈' : qzOf(m0) === 'bell' ? ' · 골든벨' : '') + (m0.open === false ? ' · 마감' : ' · 받는 중') + '</p>' +
+      '<div class="rp-g' + (sb.length < 2 ? ' one' : '') + '">' + blocks.join('') + '</div>' + dist +
+      '<div class="rp-f"><span>헤아림 HearI&#39;m · musicalpe.github.io/hearim</span><span>이름 없이 모은 답이에요</span></div>';
+    fit();
+  };
+  $('rpp').addEventListener('click', function(){ fit(); window.print(); });
+  $('rpf').addEventListener('change', fit);
+  window.addEventListener('beforeprint', fit);
+  rest('polls/' + code + '/meta').then(function(m){
+    if (!m || !m.q) { $('rps').innerHTML = '<p class="msg bad">설문을 찾지 못했어요.</p>'; return; }
+    const sb = sibOf(m).length && sibOf(m).indexOf(code) >= 0 ? sibOf(m) : [code], root = sb[0];
+    return Promise.all([
+      Promise.all(sb.map(function(c){ return rest('polls/' + c + '/meta').catch(function(){ return null; }); })),
+      Promise.all(sb.map(function(c){ return rest('polls/' + c + '/votes').catch(function(){ return null; }); })),
+      qzOf(m) ? rest('scores/' + root + '/dist').catch(function(){ return null; }) : null,
+      qzOf(m) ? rest('scores/' + root + '/ans').catch(function(){ return null; }) : null
+    ]).then(function(a){
+      document.title = '헤아림 · 결과지 · ' + ((a[0][0] || {}).q || '');
+      data = { sb: sb, metas: a[0], votes: a[1], dist: a[2], ans: a[3] ? listOf(a[3]).map(Number) : null }; render();
+      // 만든 사람이면 정답 칸도 읽어서 표시
+      loadFb().then(function(fb){
+        fb.auth().onAuthStateChanged(function(u){
+          if (!u || !a[0].some(function(x){ return x && x.owner === u.uid; })) return;
+          Promise.all(sb.map(function(c){ return fb.database().ref('keys/' + c).once('value').then(function(k){ return k.val(); }).catch(function(){ return null; }); })).then(function(ks){
+            ks.forEach(function(k, i){ if (k && typeof k.a === 'number') keys[sb[i]] = k.a; }); render();
+          });
+        });
+      }).catch(function(){});
+    });
+  }).catch(function(){ $('rps').innerHTML = '<p class="msg bad">불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요.</p>'; });
+}
+
 /* ---- 시작 ---- */
 (function(){
   if (!CFG || !CFG.databaseURL) { app.innerHTML = '<div class="top">' + logo + '</div><div class="card"><h1>아직 연결 전이에요</h1><p class="hint">파이어베이스 연결 정보(config.js)를 넣으면 쓸 수 있어요.</p></div>'; return; }
-  const p = (Q.get('p') || '').toLowerCase(), b = (Q.get('b') || '').toLowerCase();
-  if (CODE_RE.test(b)) pageBoard(b); else if (CODE_RE.test(p)) pageJoin(p); else pageHome();
+  const p = (Q.get('p') || '').toLowerCase(), b = (Q.get('b') || '').toLowerCase(), r = (Q.get('r') || '').toLowerCase();
+  if (CODE_RE.test(r)) pageReport(r); else if (CODE_RE.test(b)) pageBoard(b); else if (CODE_RE.test(p)) pageJoin(p); else pageHome();
 })();
 </script>
 </body>

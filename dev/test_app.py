@@ -302,6 +302,10 @@ try:
     pid=lambda nn: skeys[str(nn)] if isinstance(skeys,dict) else skeys[nn]
     sc=[dbget('scores/%s/%s'%(Q1,pid(nn))) for nn in (3,1,5)]; dist=dbget('scores/%s/dist'%Q1)
     dd=list(dist['d'].values()) if isinstance(dist['d'],dict) else dist['d']
+    rp=T.new_page(); rp.on('pageerror',lambda e: errs.append(str(e))); rp.goto(APP+'?r='+Q2); rp.wait_for_timeout(1500)
+    rt=rp.inner_text('#rps')
+    check('결과지(혼자 풀기): 둘째 문제 주소로 열어도 묶음 전체 · 정답 표시와 정답률 · 맞은 개수별 사람 수', rp.locator('.rq h3').count()==3 and rp.locator('.ok-t').count()==2 and '정답률' in rt and '맞은 개수별 사람 수' in rt and '혼자 풀기 퀴즈' in rt and Q1 in rt, rt[:120].replace('\n',' '))
+    rp.close()
     check('결과 알려 주기: 번호마다 맞은 개수(3번 2개 · 1번 1개 · 5번 1개) · 분포 저장 · 점수는 통째로 못 읽음', e2 and sc==[{'c':2,'n':2},{'c':1,'n':2},{'c':1,'n':2}] and dd==[0,2,1] and dist['k']==3 and getc('scores/'+Q1)==401, '%s %s'%(sc,dd))
     qv.wait_for_timeout(900); e3=qv.locator('#bds').count()==1; qv.click('#bds'); qv.wait_for_timeout(300)
     check('분포 화면: 맞은 개수별 사람 수와 문제별 정답률만 (번호 없음) · 다른 사람도 볼 수 있음', '퀴즈 결과' in qb.inner_text('#bm') and qb.locator('.cols .col').count()==3 and '2명' in qb.inner_text('.cols') and '정답률 67%' in qb.inner_text('.b-rates') and '정답률 100%' in qb.inner_text('.b-rates') and '번' not in qb.inner_text('.cols') and e3 and qv.locator('.cols .col').count()==3 and qv.locator('table.qt').count()==0)
@@ -403,6 +407,14 @@ try:
     t.click('#mc'); t.wait_for_timeout(1600); ms2=sibs(ms[2])
     check('질문 순서 바꾸기: 위로·아래로(맨 위·맨 아래는 잠김) · 저장하면 묶음 순서와 카드 첫 질문이 바뀜 · 번호·내용은 그대로', r0 and r1 and r2 and ms2==[ms[2],ms[0],ms[1]] and all(sibs(c)==ms2 for c in ms) and t.locator('.poll[data-code="%s"]'%ms[2]).count()==1 and dbget('polls/%s/meta/q'%ms[2])=='셋째' and dbget('polls/%s/meta/type'%ms[1])=='text', str(ms2))
     M1=ms[2]; ms=ms2
+    dbput('polls/%s/votes/rpvote00000001'%ms[0],{'c':1,'t':'좋아요','at':1}); dbput('polls/%s/votes/rpvote00000002'%ms[0],{'c':1,'at':2}); dbput('polls/%s/votes/rpvote00000003'%ms[2],{'a':['재미','재미있다'],'at':3}); dbput('polls/%s/votes/rpvote00000004'%ms[2],{'a':['재미'],'at':4})
+    t.reload(); t.wait_for_timeout(900); rk=t.locator('.poll[data-code="%s"] [data-act=rep]'%M1); rhref=rk.get_attribute('href')
+    rp=T.new_page(); rp.on('pageerror',lambda e: errs.append(str(e))); rp.goto(rhref); rp.wait_for_timeout(1500); rt=rp.inner_text('#rps'); hs=[x.inner_text() for x in rp.locator('.rq h3').all()]
+    z=float(rp.evaluate("getComputedStyle(document.getElementById('rps')).getPropertyValue('--z')") or 0)
+    rp.uncheck('#rpf'); z2=rp.evaluate("getComputedStyle(document.getElementById('rps')).getPropertyValue('--z')").strip()
+    rb=T.new_page(); rb.goto(APP+'?b='+M1); rb.wait_for_timeout(1200); rbl=rb.locator('#brp').count()==1 and ('r='+M1) in rb.locator('#brp').get_attribute('href'); rb.close()
+    check('결과지: 내 설문 카드와 결과 화면의 결과지 단추 · 질문 순서대로 · 고르기는 사람 수와 % · 적어서 내기는 많이 나온 답 · 한 줄 의견 · 한 장에 맞추기', ('r='+M1) in rhref and rbl and hs==['1. 셋째','2. 하나째','3. 둘째'] and '나 · 2명' not in rt and '2명 · 100%' in rt and '좋아요' in rt and '재미2' in rt.replace('\n','').replace(' ','') and '질문 3개' in rt and '답한 사람 2명' in rt and 0.5<=z<=1 and z2=='1', '%s %s %s %s'%(hs,z,z2,rt[:160].replace('\n',' ')))
+    rp.close()
     ob=t.locator('.poll[data-code="%s"] [data-act=open]'%M1); ob.click(); t.wait_for_timeout(900); n3=all(dbget('polls/%s/meta/open'%c) is False for c in ms) and '마감' in t.inner_text('.poll[data-code="%s"] .tag'%M1)
     t.locator('.poll[data-code="%s"] [data-act=open]'%M1).click(); t.wait_for_timeout(900); n4=all(dbget('polls/%s/meta/open'%c) is True for c in ms)
     d=t.locator('.poll[data-code="%s"] [data-act=del]'%M1); d.click(); d.click(); t.wait_for_timeout(1500)
