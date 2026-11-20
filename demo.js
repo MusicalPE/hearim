@@ -124,6 +124,12 @@
   window.HEARIM_DEMO = { firebase: fb, prefix: PFX };
   // 실제 연결 주소 대신 가짜 주소를 쓰게 함 (실제 설문 자료에 닿지 않게)
   window.HEARIM_CONFIG = Object.assign({}, window.HEARIM_CONFIG || {}, { databaseURL: URL0, apiKey: 'demo' });
+  // 붙여 넣어 만들기(2.7.0): 칸을 열면 예시 글을 미리 채워, 그대로 '질문 만들기'만 눌러 보게 함
+  var PASTE = '1. 오늘 체육 시간에 가장 재미있었던 활동은?\n- 피구\n- 줄넘기\n- 이어달리기\n\n2. 다음 시간에 해 보고 싶은 운동을 적어 주세요 (적어서 내기)\n\n3. 준비 운동에서 해 본 것을 모두 골라 주세요 (여러 개)\n- 체조\n- 스트레칭\n- 가볍게 달리기\n- 줄넘기';
+  document.addEventListener('click', function(e){
+    var t = e.target && e.target.closest && e.target.closest('#qpaste'); if (!t) return;
+    setTimeout(function(){ var a = document.getElementById('qpt'), w = document.getElementById('qpw'); if (a && w && !w.hidden && !a.value) a.value = PASTE; }, 0);
+  }, true);
   // 안내 띠
   document.addEventListener('DOMContentLoaded', function(){
     var b = document.createElement('div');
